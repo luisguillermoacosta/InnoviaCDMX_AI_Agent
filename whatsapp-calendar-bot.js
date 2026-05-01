@@ -2565,6 +2565,72 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
     // STEP 2: Re-read session after profile extraction
     session = sessions.getSession(cleanPhone);
 
+    // ── TIPO DE CITA ─────────────────────────────────────────────────────────
+    // Interceptar ANTES del agente: preguntar si es primera visita o ajustes.
+    // Se usa session.tipo_cita para no preguntar más de una vez por conversación.
+    {
+      const hasAppointment = session.etapa === 'cita_agendada' || session.calendar_event_id;
+      const msgLower = incomingMessage.toLowerCase();
+
+      // Si ya preguntamos y estamos esperando respuesta
+      if (session.pending_tipo_cita && !hasAppointment) {
+        const esAjuste = [
+          'ajuste', 'ajustes', 'ya compré', 'ya compre', 'ya tengo',
+          'ya soy client', 'arreglo', 'arreglos', 'de ajuste'
+        ].some(k => msgLower.includes(k));
+
+        const esPrimeraVez = [
+          'primera vez', 'primera visita', 'nueva', 'nunca he ido',
+          'nunca he visitado', 'por primera', 'no he ido', 'primer'
+        ].some(k => msgLower.includes(k));
+
+        if (esAjuste) {
+          const reply = 'Entendido 💕 Para agendar tu cita de ajustes te conectamos con una de nuestras asesoras. ¡Ya quedó registrada tu solicitud y en breve se pondrán en contacto contigo! 🤍';
+          sessions.updateSession(cleanPhone, { pending_tipo_cita: false });
+          sessions.addToHistory(cleanPhone, 'user', incomingMessage);
+          sessions.addToHistory(cleanPhone, 'assistant', reply);
+          await sendWhatsAppMessage(cleanPhone, reply);
+          logPendingTask({ phone: cleanPhone, name: session.nombre_cliente || session.nombre_novia || '', message: `[AJUSTE] "${incomingMessage}"`, historial: session.historial });
+          return;
+        }
+
+        if (esPrimeraVez) {
+          const horarios = session.horarios || require('./config').getBusinessHours();
+          const reply = `¡Perfecto, qué emoción! 👰‍♀️ ¿Qué día te gustaría visitarnos?\n\nEstamos abiertas de martes a sábado de 11am a 8pm y domingos de 11am a 6pm 🕒`;
+          sessions.updateSession(cleanPhone, { pending_tipo_cita: false, tipo_cita: 'primera_vez' });
+          sessions.addToHistory(cleanPhone, 'user', incomingMessage);
+          sessions.addToHistory(cleanPhone, 'assistant', reply);
+          await sendWhatsAppMessage(cleanPhone, reply);
+          return;
+        }
+
+        // Respuesta ambigua — preguntar de nuevo
+        const reply = '¿Podrías decirme si es tu primera visita con nosotros o si ya tienes tu vestido y buscas agendar tu cita de ajustes? 😊';
+        sessions.addToHistory(cleanPhone, 'user', incomingMessage);
+        sessions.addToHistory(cleanPhone, 'assistant', reply);
+        await sendWhatsAppMessage(cleanPhone, reply);
+        return;
+      }
+
+      // Si el usuario quiere agendar y aún no sabemos el tipo de cita, preguntar
+      const agendarKeywords = [
+        'agendar', 'quiero una cita', 'hacer una cita', 'reservar', 'apartar',
+        'quiero ir', 'quisiera ir', 'me gustaría ir', 'visitar', 'cuando tienen',
+        'tienen disponible', 'disponibilidad'
+      ];
+      const quiereAgendar = agendarKeywords.some(k => msgLower.includes(k));
+
+      if (quiereAgendar && !session.tipo_cita && !hasAppointment && !options.isButtonClick) {
+        const reply = '¡Con gusto agendamos tu cita! 💕\n\n¿Es tu primera visita con nosotros o ya tienes tu vestido y buscas agendar una cita de ajustes?';
+        sessions.updateSession(cleanPhone, { pending_tipo_cita: true });
+        sessions.addToHistory(cleanPhone, 'user', incomingMessage);
+        sessions.addToHistory(cleanPhone, 'assistant', reply);
+        await sendWhatsAppMessage(cleanPhone, reply);
+        return;
+      }
+    }
+    // ── FIN TIPO DE CITA ──────────────────────────────────────────────────────
+
     // STEP 3: Run conversational agent (handles all intents + calendar tools)
     const { runAgent } = require('./bot/agent');
 
