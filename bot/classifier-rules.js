@@ -64,6 +64,11 @@ function classifyIntentWithRules(message, session) {
   
   const isChangingTopic = topicChangeKeywords.some(kw => msg.includes(kw));
   
+  if (session.pending_tipo_cita) {
+    console.log(`📌 pending_tipo_cita activo - FORZANDO AGENDAR_NUEVA`);
+    return 'AGENDAR_NUEVA';
+  }
+
   if (session.pending_agendar_fecha) {
     // For pending_agendar_fecha, always force AGENDAR_NUEVA (user is providing appointment date)
     console.log(`📌 pending_agendar_fecha activo - FORZANDO AGENDAR_NUEVA para que el mensaje llegue a agendar.js`);

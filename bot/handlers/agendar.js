@@ -288,7 +288,58 @@ async function execute(session, message, calendarDeps = null) {
 
   // Helper to get client name (supports both nombre_cliente and nombre_novia)
   const getClientName = (sess) => sess.nombre_cliente || sess.nombre_novia || null;
-  
+
+  // ── TIPO DE CITA ──────────────────────────────────────────────────────────
+  // Antes de cualquier flujo, verificar si es primera visita o cita de ajustes.
+  // Solo aplica cuando no hay ningún otro flujo pendiente activo.
+  const hasAppointment = session.etapa === 'cita_agendada' || session.calendar_event_id;
+
+  if (session.pending_tipo_cita) {
+    const msgLower = message.toLowerCase();
+    const esAjuste = [
+      'ajuste', 'ajustes', 'ya compré', 'ya compre', 'ya tengo',
+      'ya soy client', 'arreglo', 'arreglos', 'de ajuste'
+    ].some(k => msgLower.includes(k));
+
+    const esPrimeraVez = [
+      'primera vez', 'primera visita', 'nueva', 'nunca he ido',
+      'nunca he visitado', 'por primera', 'no he ido', 'primer'
+    ].some(k => msgLower.includes(k));
+
+    if (esAjuste) {
+      return {
+        reply: 'Entendido 💕 Para agendar tu cita de ajustes te conectamos con una de nuestras asesoras. ¡Ya quedó registrada tu solicitud y en breve se pondrán en contacto contigo! 🤍',
+        sessionUpdates: { pending_tipo_cita: false },
+        escalate: true
+      };
+    }
+
+    if (esPrimeraVez) {
+      return {
+        reply: `¡Perfecto, qué emoción! 👰‍♀️ ¿Qué día te gustaría visitarnos?\n\nEstamos abiertas de ${horarios.martes_sabado} y domingos de ${horarios.domingos} 🕒`,
+        sessionUpdates: { pending_tipo_cita: false, pending_agendar_fecha: true }
+      };
+    }
+
+    // Respuesta ambigua — preguntar de nuevo
+    return {
+      reply: '¿Podrías decirme si es tu primera visita con nosotros o si ya tienes tu vestido y buscas agendar tu cita de ajustes? 😊',
+      sessionUpdates: { pending_tipo_cita: true }
+    };
+  }
+
+  // Si no hay ningún flujo pendiente activo y no tiene cita, preguntar tipo de cita
+  if (!hasAppointment &&
+      !session.pending_agendar_fecha &&
+      !session.fecha_cita_solicitada &&
+      !session.pending_nombre &&
+      !session.pending_fecha_boda) {
+    return {
+      reply: '¡Con gusto agendamos tu cita! 💕\n\n¿Es tu primera visita con nosotros o ya tienes tu vestido y buscas agendar una cita de ajustes?',
+      sessionUpdates: { pending_tipo_cita: true }
+    };
+  }
+
   // CRITICAL: If pending_agendar_fecha is active OR fecha_cita_solicitada is already set (from moving appointment flow),
   // we MUST process the appointment date immediately
   // Skip ALL info collection and submenu logic - user is providing appointment date

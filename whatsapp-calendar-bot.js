@@ -3972,13 +3972,13 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       sessions.updateSession(cleanPhone, { consecutive_otro_count: 0 });
     }
 
-    // STEP 6b: Log pending task to Google Sheets on escalation
-    if (intent === 'OTRO') {
-      const clientName = session.nombre_cliente || session.nombre || '';
+    // STEP 6b: Log pending task on escalation
+    if (intent === 'OTRO' || result.escalate) {
+      const clientName = session.nombre_cliente || session.nombre_novia || session.nombre || '';
       logPendingTask({
         phone: cleanPhone,
         name: clientName,
-        message: incomingMessage,
+        message: result.escalate ? `[AJUSTE] "${incomingMessage}"` : incomingMessage,
         historial: session.historial || []
       });
     }
