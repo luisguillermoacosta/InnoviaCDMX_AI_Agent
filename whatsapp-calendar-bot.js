@@ -21,7 +21,8 @@ const { getAIResponse, extractConversationData } = require('./openai-client');
 const { extractAppointmentDate, parseDateFromText } = require('./date-parser');
 
 // Import new intent-based architecture
-const { logPendingTask, getPendingTasks, resolvePendingTask, resolveMultipleTasks } = require('./bot/sheets-service');
+const sheetsService = require('./bot/sheets-service');
+const { logPendingTask, getPendingTasks, resolvePendingTask, resolveMultipleTasks } = sheetsService;
 const { classifyIntent } = require('./bot/classifier');
 const { extractBrideProfile } = require('./bot/profile-extractor');
 const { handlers } = require('./bot/handlers');
@@ -4314,21 +4315,22 @@ app.get('/api/analytics', async (req, res) => {
       
       // Conversaciones por día/semana/mes
       const convDate = new Date(session.ultima_actividad);
-      const dayKey = convDate.toISOString().split('T')[0];
-      const weekKey = `${convDate.getFullYear()}-W${Math.ceil((convDate.getDate() + new Date(convDate.getFullYear(), convDate.getMonth(), 1).getDay()) / 7)}`;
-      const monthKey = `${convDate.getFullYear()}-${String(convDate.getMonth() + 1).padStart(2, '0')}`;
-      
+      const dayKey = convDate.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); // YYYY-MM-DD en CDMX
+      const cdmxDate = new Date(convDate.toLocaleString('en-US', { timeZone: 'America/Mexico_City' }));
+      const weekKey = `${cdmxDate.getFullYear()}-W${Math.ceil((cdmxDate.getDate() + new Date(cdmxDate.getFullYear(), cdmxDate.getMonth(), 1).getDay()) / 7)}`;
+      const monthKey = `${cdmxDate.getFullYear()}-${String(cdmxDate.getMonth() + 1).padStart(2, '0')}`;
+
       conversationsByDay[dayKey] = (conversationsByDay[dayKey] || 0) + 1;
       conversationsByWeek[weekKey] = (conversationsByWeek[weekKey] || 0) + 1;
       conversationsByMonth[monthKey] = (conversationsByMonth[monthKey] || 0) + 1;
-      
+
       // Solo contar conversaciones de usuarios nuevos por día
       // Un usuario nuevo es aquel cuyo primer mensaje fue en el último mes
       // Contamos la conversación nueva en el día de su primer mensaje
       if (isInCurrentPeriod && newUsers.has(phone)) {
         // Usar la fecha del primer mensaje para determinar el día de la conversación nueva
         // (firstMessageDate ya fue calculado arriba)
-        const firstMessageDayKey = firstMessageDate.toISOString().split('T')[0];
+        const firstMessageDayKey = firstMessageDate.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
         
         // Solo contar si el primer mensaje está en el periodo actual
         if (firstMessageDate >= periodStart && firstMessageDate <= now) {
@@ -4434,7 +4436,7 @@ app.get('/api/analytics', async (req, res) => {
         // Citas por día y hora
         if (session.fecha_cita) {
           const aptDate = new Date(session.fecha_cita);
-          const aptDayKey = aptDate.toISOString().split('T')[0];
+          const aptDayKey = aptDate.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
           appointmentsByDay[aptDayKey] = (appointmentsByDay[aptDayKey] || 0) + 1;
           
           // Intentar extraer hora de la cita
@@ -5138,7 +5140,9 @@ app.get('/api/export-snapshot', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 // Inicializar Google Calendar antes de iniciar el servidor
-initGoogleAuth().then(() => {
+initGoogleAuth()
+  .then(() => Promise.all([sessions.init(), sheetsService.init()]))
+  .then(() => {
   app.listen(PORT, () => {
     console.log(`\n🚀 =====================================`);
     console.log(`✅ Bot de WhatsApp escuchando en puerto ${PORT}`);

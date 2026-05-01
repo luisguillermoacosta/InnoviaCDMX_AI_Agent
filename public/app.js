@@ -215,7 +215,7 @@ function updateUsageMetrics(usage) {
     // se actualizan en updatePerformanceMetrics y updateBusinessMetrics respectivamente
     
     // KPIs secundarios (ocultos por ahora)
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
     const todayCount = (usage.conversationsByDay || []).find(d => d.date === today)?.count || 0;
     const periodEl = document.getElementById('conversations-period');
     if (periodEl) periodEl.textContent = `${todayCount} hoy`;
