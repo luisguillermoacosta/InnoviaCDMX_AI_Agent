@@ -12,7 +12,7 @@
  * dependencies from the main bot file.
  */
 
-const { getBusinessHours } = require('../config');
+const { getBusinessHours, getHolidays } = require('../config');
 
 /**
  * Check if a day is open according to business hours
@@ -30,12 +30,21 @@ function isDayOpen(dateString) {
     
     const hours = getBusinessHours();
     
-    // Verificar si el día está cerrado
+    // Verificar si el día está cerrado por horario
     if (dayName === 'lunes' && hours.lunes === 'Cerrado') {
       console.log(`   ❌ ${dayName.charAt(0).toUpperCase() + dayName.slice(1)} está cerrado`);
       return false;
     }
-    
+
+    // Verificar si es asueto
+    const mmdd = `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const holidays = getHolidays();
+    const holiday = holidays.find(h => h.fecha === mmdd);
+    if (holiday) {
+      console.log(`   ❌ ${dateString} es asueto: ${holiday.nombre}`);
+      return false;
+    }
+
     // Los demás días están abiertos según la configuración
     return true;
   } catch (error) {

@@ -1,4 +1,14 @@
 {
+  "asuetos": [
+    { "fecha": "01-01", "nombre": "Año nuevo" },
+    { "fecha": "05-01", "nombre": "Día del trabajo" },
+    { "fecha": "05-10", "nombre": "Día de las madres" },
+    { "fecha": "09-16", "nombre": "Día de la independencia" },
+    { "fecha": "12-24", "nombre": "Navidad" },
+    { "fecha": "12-25", "nombre": "Navidad" },
+    { "fecha": "12-31", "nombre": "Año nuevo" }
+  ],
+
   "staff_phones": [
     "9179605545",
     "4492107201",

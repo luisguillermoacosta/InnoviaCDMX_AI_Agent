@@ -133,6 +133,10 @@ function getFAQs() {
   return config.faqs || [];
 }
 
+function getHolidays() {
+  return config.asuetos || [];
+}
+
 /**
  * Get conversation flow configuration
  */
@@ -342,6 +346,9 @@ module.exports = {
   
   // FAQs
   getFAQs,
+
+  // Holidays
+  getHolidays,
 
   // Conversation flow
   getConversationFlow,
