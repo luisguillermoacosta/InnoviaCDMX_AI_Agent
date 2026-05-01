@@ -415,11 +415,12 @@ function updateConversationsDayChart(data) {
     if (!ctx) return;
     
     const labels = data.map(d => {
-        const date = new Date(d.date);
+        const [year, month, day] = d.date.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
         return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
     });
     const values = data.map(d => d.count);
-    
+
     if (charts.conversationsDay) {
         charts.conversationsDay.destroy();
     }
@@ -528,11 +529,12 @@ function updateAppointmentsDayChart(data) {
     if (!ctx) return;
     
     const labels = data.map(d => {
-        const date = new Date(d.date);
+        const [year, month, day] = d.date.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
         return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
     });
     const values = data.map(d => d.count);
-    
+
     if (charts.appointmentsDay) {
         charts.appointmentsDay.destroy();
     }
