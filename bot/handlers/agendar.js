@@ -290,50 +290,46 @@ async function execute(session, message, calendarDeps = null) {
   const getClientName = (sess) => sess.nombre_cliente || sess.nombre_novia || null;
 
   // ── TIPO DE CITA ──────────────────────────────────────────────────────────
-  // Antes de cualquier flujo, verificar si es primera visita o cita de ajustes.
-  // Solo aplica cuando no hay ningún otro flujo pendiente activo.
+  // Preguntar UNA VEZ si es primera visita o cita de ajustes, ANTES de
+  // cualquier otro flujo. Se usa session.tipo_cita para no preguntar dos veces.
   const hasAppointment = session.etapa === 'cita_agendada' || session.calendar_event_id;
 
-  if (session.pending_tipo_cita) {
-    const msgLower = message.toLowerCase();
-    const esAjuste = [
-      'ajuste', 'ajustes', 'ya compré', 'ya compre', 'ya tengo',
-      'ya soy client', 'arreglo', 'arreglos', 'de ajuste'
-    ].some(k => msgLower.includes(k));
+  if (!hasAppointment && !session.tipo_cita) {
+    if (session.pending_tipo_cita) {
+      const msgLower = message.toLowerCase();
+      const esAjuste = [
+        'ajuste', 'ajustes', 'ya compré', 'ya compre', 'ya tengo',
+        'ya soy client', 'arreglo', 'arreglos', 'de ajuste'
+      ].some(k => msgLower.includes(k));
 
-    const esPrimeraVez = [
-      'primera vez', 'primera visita', 'nueva', 'nunca he ido',
-      'nunca he visitado', 'por primera', 'no he ido', 'primer'
-    ].some(k => msgLower.includes(k));
+      const esPrimeraVez = [
+        'primera vez', 'primera visita', 'nueva', 'nunca he ido',
+        'nunca he visitado', 'por primera', 'no he ido', 'primer'
+      ].some(k => msgLower.includes(k));
 
-    if (esAjuste) {
+      if (esAjuste) {
+        return {
+          reply: 'Entendido 💕 Para agendar tu cita de ajustes te conectamos con una de nuestras asesoras. ¡Ya quedó registrada tu solicitud y en breve se pondrán en contacto contigo! 🤍',
+          sessionUpdates: { pending_tipo_cita: false },
+          escalate: true
+        };
+      }
+
+      if (esPrimeraVez) {
+        return {
+          reply: `¡Perfecto, qué emoción! 👰‍♀️ ¿Qué día te gustaría visitarnos?\n\nEstamos abiertas de ${horarios.martes_sabado} y domingos de ${horarios.domingos} 🕒`,
+          sessionUpdates: { pending_tipo_cita: false, tipo_cita: 'primera_vez', pending_agendar_fecha: true }
+        };
+      }
+
+      // Respuesta ambigua — preguntar de nuevo
       return {
-        reply: 'Entendido 💕 Para agendar tu cita de ajustes te conectamos con una de nuestras asesoras. ¡Ya quedó registrada tu solicitud y en breve se pondrán en contacto contigo! 🤍',
-        sessionUpdates: { pending_tipo_cita: false },
-        escalate: true
+        reply: '¿Podrías decirme si es tu primera visita con nosotros o si ya tienes tu vestido y buscas agendar tu cita de ajustes? 😊',
+        sessionUpdates: { pending_tipo_cita: true }
       };
     }
 
-    if (esPrimeraVez) {
-      return {
-        reply: `¡Perfecto, qué emoción! 👰‍♀️ ¿Qué día te gustaría visitarnos?\n\nEstamos abiertas de ${horarios.martes_sabado} y domingos de ${horarios.domingos} 🕒`,
-        sessionUpdates: { pending_tipo_cita: false, pending_agendar_fecha: true }
-      };
-    }
-
-    // Respuesta ambigua — preguntar de nuevo
-    return {
-      reply: '¿Podrías decirme si es tu primera visita con nosotros o si ya tienes tu vestido y buscas agendar tu cita de ajustes? 😊',
-      sessionUpdates: { pending_tipo_cita: true }
-    };
-  }
-
-  // Si no hay ningún flujo pendiente activo y no tiene cita, preguntar tipo de cita
-  if (!hasAppointment &&
-      !session.pending_agendar_fecha &&
-      !session.fecha_cita_solicitada &&
-      !session.pending_nombre &&
-      !session.pending_fecha_boda) {
+    // No hemos preguntado aún — preguntar ahora, independientemente de otros flags pendientes
     return {
       reply: '¡Con gusto agendamos tu cita! 💕\n\n¿Es tu primera visita con nosotros o ya tienes tu vestido y buscas agendar una cita de ajustes?',
       sessionUpdates: { pending_tipo_cita: true }
