@@ -1124,57 +1124,219 @@ body {
     box-shadow: 0 0 0 3px rgba(0, 245, 255, 0.2);
 }
 
-/* Responsive */
+/* ── Tablet (≤1024px) ──────────────────────────────────────────────────────── */
 @media (max-width: 1024px) {
     .conversations-layout {
         grid-template-columns: 1fr;
         height: auto;
     }
-    
+
     .kpi-grid {
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     }
-    
+
     .charts-grid {
         grid-template-columns: 1fr;
     }
 }
 
+/* ── Mobile (≤768px) ───────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-    body {
-        padding: 16px;
+
+    /* Container */
+    .container {
+        padding: 0 12px;
     }
-    
+
+    /* Header */
+    .header {
+        padding-top: 12px;
+        margin-bottom: 0;
+    }
+
     .header-content {
         flex-direction: column;
         align-items: flex-start;
-        gap: 16px;
+        gap: 10px;
+        padding-bottom: 12px;
     }
-    
+
+    .header-logo {
+        width: 32px;
+        height: 32px;
+    }
+
+    .header-logo::after {
+        font-size: 16px;
+    }
+
     .header-title h1 {
-        font-size: 24px;
+        font-size: 16px;
     }
-    
-    .tab-content {
-        padding: 24px;
+
+    .header-subtitle {
+        font-size: 11px;
     }
-    
-    .tabs {
-        padding: 0 16px;
+
+    .header-actions {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .date-selector {
+        flex: 1;
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
-    
+
+    .date-btn {
+        padding: 5px 9px;
+        font-size: 12px;
+    }
+
+    /* Snapshot button: icon only on mobile */
+    .snapshot-label {
+        display: none;
+    }
+
+    /* Tabs */
+    .tabs {
+        gap: 0;
+        margin-bottom: 16px;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .tab-btn {
-        padding: 16px 20px;
-        font-size: 14px;
+        padding: 10px 11px;
+        font-size: 12px;
     }
-    
+
+    /* KPI grid — 2 columns instead of 1 */
     .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .kpi-card {
+        padding: 14px 12px;
+    }
+
+    .kpi-value {
+        font-size: 22px;
+    }
+
+    .kpi-icon {
+        font-size: 18px;
+        margin-bottom: 8px;
+    }
+
+    /* Charts */
+    .chart-card canvas {
+        max-height: 130px;
+        height: 130px !important;
+        flex: 0 0 130px;
+    }
+
+    /* Metrics section */
+    .metrics-section {
+        padding: 14px;
+    }
+
+    /* Insights grid — single column */
+    .insights-container {
         grid-template-columns: 1fr;
     }
-    
-    .metrics-section {
-        padding: 20px;
+
+    /* Conversations */
+    .conversations-layout {
+        height: auto;
+    }
+
+    .conversations-list-container {
+        padding: 14px;
+        max-height: 340px;
+    }
+
+    .conversations-list-container h3 {
+        font-size: 15px;
+        margin-bottom: 12px;
+    }
+
+    .conversation-detail {
+        padding: 14px;
+        min-height: 400px;
+    }
+
+    /* Appointment cards — stack vertically */
+    .appointment-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 14px;
+    }
+
+    .appointment-date {
+        text-align: left;
+        font-size: 15px;
+    }
+
+    /* Performance grid — single column on small screens */
+    .performance-metrics-list {
+        grid-template-columns: 1fr;
+    }
+
+    /* Config section */
+    .config-section {
+        padding: 14px;
+    }
+
+    .config-section h2 {
+        font-size: 18px;
+        margin-bottom: 16px;
+    }
+
+    /* Bot mode buttons — 1 column on mobile */
+    .bot-mode-btn-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Section */
+    .section {
+        padding: 14px;
+    }
+
+    .section h2 {
+        font-size: 18px;
+        margin-bottom: 16px;
+    }
+}
+
+/* ── Very small phones (≤420px) ────────────────────────────────────────────── */
+@media (max-width: 420px) {
+    .container {
+        padding: 0 8px;
+    }
+
+    .tab-btn {
+        padding: 9px 8px;
+        font-size: 11px;
+    }
+
+    .kpi-value {
+        font-size: 20px;
+    }
+
+    .kpi-label {
+        font-size: 10px;
+    }
+
+    .date-btn {
+        padding: 5px 7px;
+        font-size: 11px;
     }
 }
 
@@ -1328,16 +1490,28 @@ body {
     .logs-header {
         flex-direction: column;
         align-items: flex-start;
-        gap: 16px;
+        gap: 12px;
     }
-    
+
     .logs-controls {
         width: 100%;
         flex-wrap: wrap;
     }
-    
+
     .logs-container {
         max-height: 60vh;
-        font-size: 12px;
+        font-size: 11px;
+        padding: 10px;
+    }
+
+    .log-entry {
+        padding: 8px 10px;
+    }
+
+    .log-timestamp,
+    .log-level {
+        display: block;
+        margin-right: 0;
+        margin-bottom: 2px;
     }
 }
