@@ -1718,6 +1718,43 @@ app.post('/api/recover-conversations', async (req, res) => {
   res.json({ results, ok, errors });
 });
 
+// POST /api/proactive-message
+// Envía un mensaje proactivo a números que no recibieron respuesta.
+// Inyecta un mensaje sintético en la sesión y lo procesa como si el
+// usuario lo hubiera enviado, usando forceProcess=true.
+app.post('/api/proactive-message', async (req, res) => {
+  const { phones, message = 'Hola' } = req.body;
+  if (!phones || !Array.isArray(phones) || phones.length === 0) {
+    return res.status(400).json({ error: 'Se requiere un array "phones"' });
+  }
+
+  const results = [];
+
+  for (const phone of phones) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    try {
+      console.log(`📤 [PROACTIVO] Enviando mensaje a ${cleanPhone}: "${message}"`);
+      // Inyectar el mensaje en el historial para que quede registro
+      sessions.addToHistory(cleanPhone, 'user', message);
+      sessions.updateSession(cleanPhone, { ultima_actividad: new Date().toISOString() });
+      // Procesar como si el usuario lo hubiera enviado
+      await processIncomingMessage(cleanPhone, message, { forceProcess: true });
+      results.push({ phone: cleanPhone, status: 'ok' });
+    } catch (err) {
+      console.error(`❌ [PROACTIVO] Error enviando a ${cleanPhone}:`, err.message);
+      results.push({ phone: cleanPhone, status: 'error', reason: err.message });
+    }
+    // Pausa entre mensajes para no saturar la API
+    if (phones.length > 1) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+
+  const ok = results.filter(r => r.status === 'ok').length;
+  console.log(`✅ [PROACTIVO] Completado: ${ok}/${phones.length} enviados`);
+  res.json({ results, ok, total: phones.length });
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 
 // Verificación del webhook (GET) - Chakra puede requerir esto
