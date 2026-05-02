@@ -2843,7 +2843,7 @@ app.get('/api/stats', async (req, res) => {
       }
       
       // Contar citas agendadas
-      if (session.etapa === 'cita_agendada' || session.calendar_event_id) {
+      if (session.etapa === 'cita_agendada') {
         appointmentsTotal++;
         if (session.fecha_cita) {
           const appointmentDate = new Date(session.fecha_cita);
@@ -3100,7 +3100,7 @@ app.get('/api/analytics', async (req, res) => {
       }
       
       // Citas
-      const hasAppointment = session.etapa === 'cita_agendada' || !!session.calendar_event_id;
+      const hasAppointment = session.etapa === 'cita_agendada';
       if (hasAppointment) {
         conversationsWithAppointment++;
         totalAppointmentsGenerated++;
@@ -3743,7 +3743,7 @@ app.get('/api/appointments', async (req, res) => {
     const appointments = [];
     
     for (const { phone, session } of allSessions) {
-      if (session.etapa === 'cita_agendada' || session.calendar_event_id) {
+      if (session.etapa === 'cita_agendada') {
         appointments.push({
           phone,
           name: session.nombre_cliente || session.nombre_novia || 'Sin nombre',
