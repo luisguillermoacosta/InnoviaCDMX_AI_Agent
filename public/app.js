@@ -422,9 +422,12 @@ function updateConversationsDayChart(data) {
     const values = data.map(d => d.count);
 
     if (charts.conversationsDay) {
-        charts.conversationsDay.destroy();
+        charts.conversationsDay.data.labels = labels;
+        charts.conversationsDay.data.datasets[0].data = values;
+        charts.conversationsDay.update('none');
+        return;
     }
-    
+
     charts.conversationsDay = new Chart(ctx, {
         type: 'line',
         data: {
@@ -479,7 +482,14 @@ function updateConversationTypeChart(etapaDistribution) {
     const colors = ['#00f5ff', '#ff6b35', '#00ff88'];
 
     if (charts.conversationType) {
-        charts.conversationType.destroy();
+        charts.conversationType.data.datasets[0].data = displayValues;
+        charts.conversationType.options.plugins.tooltip.callbacks.label = function(context) {
+            if (total === 0) return ' Sin sesiones aún';
+            const pct = ((context.parsed / total) * 100).toFixed(1);
+            return ` ${context.label}: ${context.parsed} (${pct}%)`;
+        };
+        charts.conversationType.update('none');
+        return;
     }
 
     charts.conversationType = new Chart(ctx, {
@@ -536,9 +546,12 @@ function updateAppointmentsDayChart(data) {
     const values = data.map(d => d.count);
 
     if (charts.appointmentsDay) {
-        charts.appointmentsDay.destroy();
+        charts.appointmentsDay.data.labels = labels;
+        charts.appointmentsDay.data.datasets[0].data = values;
+        charts.appointmentsDay.update('none');
+        return;
     }
-    
+
     charts.appointmentsDay = new Chart(ctx, {
         type: 'line',
         data: {
@@ -588,9 +601,12 @@ function updateAppointmentsHourChart(data) {
     const values = Object.keys(hourCounts).sort().map(h => hourCounts[h]);
     
     if (charts.appointmentsHour) {
-        charts.appointmentsHour.destroy();
+        charts.appointmentsHour.data.labels = labels;
+        charts.appointmentsHour.data.datasets[0].data = values;
+        charts.appointmentsHour.update('none');
+        return;
     }
-    
+
     charts.appointmentsHour = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -646,10 +662,11 @@ function updateBusinessWeeklyChart(business) {
     const botData = [35, 45, 55, 55];
     const humanData = [10, 15, 10, 10];
     
+    // Data is static/simulated — skip redraw if chart already exists
     if (charts.businessWeekly) {
-        charts.businessWeekly.destroy();
+        return;
     }
-    
+
     charts.businessWeekly = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -734,10 +751,11 @@ function updateActivityHeatmap(business) {
         });
     });
     
+    // Data is static/simulated — skip redraw if chart already exists
     if (charts.activityHeatmap) {
-        charts.activityHeatmap.destroy();
+        return;
     }
-    
+
     // Crear un heatmap usando un gráfico de barras apiladas horizontal
     // Cada día es una fila, cada hora es una columna
     charts.activityHeatmap = new Chart(ctx, {
