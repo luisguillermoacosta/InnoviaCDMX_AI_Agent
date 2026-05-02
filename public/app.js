@@ -953,7 +953,7 @@ async function loadConversations() {
             const unread   = !isActive && isConversationUnread(conv.phone, conv.messageCount);
             const paused   = conv.botPaused;
             const pauseBg    = paused ? '#2d6a4f' : '#ff6b35';
-            const pauseTitle = paused ? 'Bot pausado — clic para reanudar' : 'Pausar bot 10 min';
+            const pauseTitle = paused ? 'Bot pausado — clic para reanudar' : 'Pausar bot 2 horas';
             const btnId      = `pause-btn-${conv.phone.replace(/\D/g,'')}`;
             const pausedUntilAttr = paused && conv.pausedUntil ? `data-paused-until="${conv.pausedUntil}"` : '';
             return `
@@ -1107,7 +1107,7 @@ async function togglePauseConversation(phone, currentlyPaused) {
             await fetch('/admin/pause-bot', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, minutes: 40 })
+                body: JSON.stringify({ phone, minutes: 120 })
             });
         }
         // Refrescar la lista para reflejar el nuevo estado

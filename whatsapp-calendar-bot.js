@@ -1575,7 +1575,7 @@ app.get('/dashboard', (req, res) => {
 
 // Pausa el bot para una conversación (el agente humano toma el control)
 app.post('/admin/pause-bot', (req, res) => {
-  const { phone, minutes = 40 } = req.body;
+  const { phone, minutes = 120 } = req.body;
 
   if (!phone) {
     return res.status(400).json({ error: 'Se requiere el campo "phone"' });
