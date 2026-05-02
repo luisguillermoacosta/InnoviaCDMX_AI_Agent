@@ -1618,6 +1618,96 @@ app.get('/admin/pause-status/:phone', (req, res) => {
   });
 });
 
+// ── Recuperación de conversaciones perdidas ───────────────────────────────────
+
+// GET /api/missed-conversations?hours=N
+// Devuelve sesiones donde el último mensaje del historial es del usuario
+// (el bot nunca respondió) y tuvieron actividad en las últimas N horas.
+app.get('/api/missed-conversations', (req, res) => {
+  const hours = parseInt(req.query.hours) || 24;
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  const allSessions = sessions.getAllSessions();
+  const missed = [];
+
+  for (const { phone, session } of allSessions) {
+    // Necesita historial con al menos un mensaje
+    const hist = session.historial || [];
+    if (hist.length === 0) continue;
+
+    // El último mensaje debe ser del usuario
+    const last = hist[hist.length - 1];
+    if (last.role !== 'user') continue;
+
+    // Debe tener actividad dentro del período
+    const lastActivity = session.ultima_actividad
+      ? new Date(session.ultima_actividad)
+      : null;
+    if (!lastActivity || lastActivity < cutoff) continue;
+
+    missed.push({
+      phone,
+      nombre: session.nombre_novia || session.nombre || null,
+      lastUserMessage: last.content,
+      lastActivity: lastActivity.toISOString(),
+      etapa: session.etapa || 'primer_contacto',
+      messageCount: hist.length
+    });
+  }
+
+  // Ordenar por actividad más reciente primero
+  missed.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+  console.log(`🔍 Conversaciones sin respuesta en últimas ${hours}h: ${missed.length}`);
+  res.json({ missed, count: missed.length, hours });
+});
+
+// POST /api/recover-conversations
+// Re-procesa el último mensaje del usuario para los teléfonos dados.
+// Usa forceProcess=true para saltar la verificación de modo del bot.
+app.post('/api/recover-conversations', async (req, res) => {
+  const { phones } = req.body;
+  if (!phones || !Array.isArray(phones) || phones.length === 0) {
+    return res.status(400).json({ error: 'Se requiere un array "phones"' });
+  }
+
+  const results = [];
+
+  for (const phone of phones) {
+    const session = sessions.getSession(phone);
+    const hist = session.historial || [];
+    if (hist.length === 0) {
+      results.push({ phone, status: 'skip', reason: 'sin historial' });
+      continue;
+    }
+
+    const last = hist[hist.length - 1];
+    if (last.role !== 'user') {
+      results.push({ phone, status: 'skip', reason: 'último mensaje no es del usuario' });
+      continue;
+    }
+
+    try {
+      console.log(`🔄 Recuperando conversación ${phone}: "${last.content.substring(0, 60)}..."`);
+      await processIncomingMessage(phone, last.content, { forceProcess: true });
+      results.push({ phone, status: 'ok', message: last.content.substring(0, 60) });
+    } catch (err) {
+      console.error(`❌ Error recuperando ${phone}:`, err.message);
+      results.push({ phone, status: 'error', reason: err.message });
+    }
+
+    // Pequeña pausa entre mensajes para no saturar la API de WhatsApp
+    if (phones.length > 1) {
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+
+  const ok = results.filter(r => r.status === 'ok').length;
+  const errors = results.filter(r => r.status === 'error').length;
+  console.log(`✅ Recuperación completa: ${ok} ok, ${errors} errores`);
+  res.json({ results, ok, errors });
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 
 // Verificación del webhook (GET) - Chakra puede requerir esto
@@ -2225,12 +2315,18 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
   const botMode = getBotMode();
   console.log(`🔒 Modo leído: "${botMode}"`);
   const cleanPhone = senderPhone ? senderPhone.replace(/\D/g, '') : '';
-  
+
+  // RECOVERY MODE: si viene de la recuperación de conversaciones perdidas,
+  // saltamos la verificación de modo del bot (el admin ya decidió recuperarlas).
+  if (options.forceProcess) {
+    console.log(`🔄 forceProcess=true — saltando verificación de modo del bot (recuperación manual)`);
+  } else {
+
   // Verificación inmediata y estricta
   const isInactive = String(botMode).trim().toLowerCase() === 'inactive';
   console.log(`🔒 Comparación: String("${botMode}").trim().toLowerCase() === 'inactive'`);
   console.log(`🔒 Resultado: ${isInactive}`);
-  
+
   if (isInactive) {
     // NO hacer NADA más - terminar inmediatamente
     console.log(`⏸️  ============================================`);
@@ -2241,6 +2337,8 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
     console.log(`⏸️  ============================================\n`);
     throw new Error('BOT_INACTIVE_BLOCKED');
   }
+
+  } // fin bloque de verificación de modo (saltado si forceProcess=true)
   console.log(`✅ Bot no está inactive, continuando...\n`);
   
   console.log(`\n🚨 ============================================`);
@@ -2272,6 +2370,8 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
   console.log(`🔍 ============================================\n`);
   
   // Verificar según el modo - CRITICAL: Esto debe ser lo PRIMERO
+  // (saltado si forceProcess=true — recuperación manual desde el dashboard)
+  if (!options.forceProcess) {
   // Validación estricta del modo
   const validModes = ['inactive', 'test', 'active'];
   if (!validModes.includes(botMode)) {
@@ -2280,7 +2380,7 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
     console.log(`⏸️  ============================================\n`);
     throw new Error('BOT_INVALID_MODE_BLOCKED');
   }
-  
+
   // CRITICAL: Verificación estricta con comparación de strings
   const isInactive2 = String(botMode).trim().toLowerCase() === 'inactive';
   const isTest = String(botMode).trim().toLowerCase() === 'test';
@@ -2352,7 +2452,8 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
   } else {
     console.log(`⚠️  [BOT MODE CHECK] Modo desconocido: "${botMode}" - Procesando como activo\n`);
   }
-  
+  } // fin bloque !forceProcess
+
   // Enviar indicador de "escribiendo..." inmediatamente
   // (solo si no es un click de botón, ya que esos son instantáneos)
   if (!options.isButtonClick) {

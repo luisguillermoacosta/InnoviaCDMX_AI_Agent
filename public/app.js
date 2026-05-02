@@ -1966,6 +1966,114 @@ function updateStatus(connected) {
 // Exponer función globalmente para onclick
 window.selectConversation = selectConversation;
 
+// ── Recuperar conversaciones perdidas ─────────────────────────────────────────
+
+let _missedConversations = [];
+
+async function scanMissedConversations() {
+    const hours = document.getElementById('missed-hours')?.value || 24;
+    const resultsBox = document.getElementById('missed-conv-results');
+    const listEl = document.getElementById('missed-conv-list');
+    const statusEl = document.getElementById('missed-recover-status');
+
+    listEl.innerHTML = '<p class="loading-text">Buscando...</p>';
+    resultsBox.style.display = 'block';
+    statusEl.textContent = '';
+
+    try {
+        const res = await fetch(`/api/missed-conversations?hours=${hours}`);
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+
+        _missedConversations = data.missed || [];
+
+        if (_missedConversations.length === 0) {
+            listEl.innerHTML = `<p style="color:#28a745; font-size:14px; margin:0;">✅ No hay conversaciones sin respuesta en las últimas ${hours} horas.</p>`;
+            document.getElementById('btn-recover-all').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('btn-recover-all').style.display = 'inline-block';
+
+        listEl.innerHTML = `
+            <p style="font-size:13px; color:var(--text-secondary); margin:0 0 10px 0;">
+                Se encontraron <strong style="color:var(--text-primary);">${_missedConversations.length}</strong> conversación(es) sin respuesta:
+            </p>
+            ${_missedConversations.map(c => `
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;
+                            padding:10px 14px; background:var(--bg-secondary); border-radius:8px;
+                            margin-bottom:6px; border-left:3px solid #ff6b35;">
+                    <div style="min-width:0; flex:1;">
+                        <div style="font-weight:600; font-size:13px;">${formatPhone(c.phone)}${c.nombre ? ` · <span style="color:#667eea;">${escapeHtml(c.nombre)}</span>` : ''}</div>
+                        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(c.lastUserMessage)}">
+                            💬 ${escapeHtml(c.lastUserMessage.substring(0, 80))}${c.lastUserMessage.length > 80 ? '…' : ''}
+                        </div>
+                        <div style="font-size:11px; color:var(--text-light); margin-top:2px;">
+                            ${formatDate(c.lastActivity)}
+                        </div>
+                    </div>
+                    <button onclick="recoverOne('${c.phone}')"
+                        style="flex-shrink:0; padding:6px 14px; background:#28a745; color:#fff;
+                               border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600;">
+                        Responder
+                    </button>
+                </div>
+            `).join('')}
+        `;
+    } catch (err) {
+        console.error('Error buscando conversaciones perdidas:', err);
+        listEl.innerHTML = `<p style="color:#dc3545; font-size:14px;">Error al buscar: ${err.message}</p>`;
+    }
+}
+
+async function recoverOne(phone) {
+    await _doRecover([phone]);
+}
+
+async function recoverAllMissed() {
+    const phones = _missedConversations.map(c => c.phone);
+    if (phones.length === 0) return;
+    if (!confirm(`¿Enviar respuesta a ${phones.length} conversación(es) sin respuesta?`)) return;
+    await _doRecover(phones);
+}
+
+async function _doRecover(phones) {
+    const statusEl = document.getElementById('missed-recover-status');
+    const btnAll = document.getElementById('btn-recover-all');
+
+    if (statusEl) statusEl.textContent = `Enviando respuestas (0 / ${phones.length})…`;
+    if (btnAll) { btnAll.disabled = true; btnAll.textContent = 'Enviando…'; }
+
+    try {
+        const res = await fetch('/api/recover-conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phones })
+        });
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+
+        if (statusEl) {
+            statusEl.textContent = `✅ ${data.ok} enviada(s)${data.errors > 0 ? ` · ⚠️ ${data.errors} error(es)` : ''}`;
+            statusEl.style.color = data.errors > 0 ? '#ff6b35' : '#28a745';
+        }
+
+        // Volver a escanear para actualizar la lista
+        setTimeout(scanMissedConversations, 1000);
+    } catch (err) {
+        console.error('Error recuperando conversaciones:', err);
+        if (statusEl) { statusEl.textContent = `❌ Error: ${err.message}`; statusEl.style.color = '#dc3545'; }
+    } finally {
+        if (btnAll) { btnAll.disabled = false; btnAll.textContent = '✅ Responder a todas'; }
+    }
+}
+
+window.recoverOne = recoverOne;
+window.recoverAllMissed = recoverAllMissed;
+window.scanMissedConversations = scanMissedConversations;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function downloadSnapshot() {
     try {
         const res = await fetch('/api/export-snapshot');
