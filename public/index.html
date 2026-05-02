@@ -219,38 +219,6 @@
                     <div id="bot-mode-status-message" class="status-message" style="margin-top: 12px; display: none;"></div>
                 </div>
             </div>
-            <!-- Recuperar conversaciones perdidas -->
-            <div class="config-section" style="margin-bottom: 32px;">
-                <h2>Recuperar Conversaciones Perdidas</h2>
-                <div style="background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
-                    <p style="color: var(--text-secondary); font-size: 14px; margin: 0 0 16px 0;">
-                        Si el bot estuvo apagado por error, usa esta herramienta para detectar los mensajes que quedaron sin respuesta y enviarles una respuesta ahora.
-                    </p>
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-                        <label style="font-size: 14px; color: var(--text-secondary); white-space: nowrap;">Buscar en las últimas</label>
-                        <select id="missed-hours" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; cursor: pointer;">
-                            <option value="3">3 horas</option>
-                            <option value="6">6 horas</option>
-                            <option value="12">12 horas</option>
-                            <option value="24" selected>24 horas</option>
-                        </select>
-                        <button onclick="scanMissedConversations()" class="btn-primary" style="padding: 8px 18px; font-size: 14px;">
-                            🔍 Buscar
-                        </button>
-                    </div>
-                    <div id="missed-conv-results" style="display:none;">
-                        <div id="missed-conv-list" style="margin-bottom: 14px;"></div>
-                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <button onclick="recoverAllMissed()" id="btn-recover-all"
-                                style="padding: 10px 20px; background: #28a745; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
-                                ✅ Responder a todas
-                            </button>
-                            <span id="missed-recover-status" style="font-size: 13px; color: var(--text-secondary);"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="config-section">
                 <h2>Información del Negocio</h2>
                 <form id="config-form">
