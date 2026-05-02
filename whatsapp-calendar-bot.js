@@ -1664,6 +1664,7 @@ app.get('/api/missed-conversations', (req, res) => {
 
 // POST /api/recover-conversations
 // Re-procesa el último mensaje del usuario para los teléfonos dados.
+// Solo aplica a conversaciones con actividad en las últimas 24 horas.
 // Usa forceProcess=true para saltar la verificación de modo del bot.
 app.post('/api/recover-conversations', async (req, res) => {
   const { phones } = req.body;
@@ -1671,6 +1672,8 @@ app.post('/api/recover-conversations', async (req, res) => {
     return res.status(400).json({ error: 'Se requiere un array "phones"' });
   }
 
+  const MAX_RECOVERY_HOURS = 24;
+  const cutoff24h = new Date(Date.now() - MAX_RECOVERY_HOURS * 60 * 60 * 1000);
   const results = [];
 
   for (const phone of phones) {
@@ -1684,6 +1687,13 @@ app.post('/api/recover-conversations', async (req, res) => {
     const last = hist[hist.length - 1];
     if (last.role !== 'user') {
       results.push({ phone, status: 'skip', reason: 'último mensaje no es del usuario' });
+      continue;
+    }
+
+    // Seguridad: solo recuperar conversaciones de las últimas 24 horas
+    const lastActivity = session.ultima_actividad ? new Date(session.ultima_actividad) : null;
+    if (!lastActivity || lastActivity < cutoff24h) {
+      results.push({ phone, status: 'skip', reason: 'conversación fuera del límite de 24 horas' });
       continue;
     }
 
