@@ -2799,8 +2799,10 @@ app.get('/api/stats', async (req, res) => {
   try {
     const allSessions = sessions.getAllSessions();
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+    // Medianoche en CDMX (UTC-6, sin DST desde 2023)
+    const todayStrCDMX = now.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    const todayStart = new Date(todayStrCDMX + 'T00:00:00-06:00');
+
     // Calcular métricas
     let totalMessages = 0;
     let messagesToday = 0;
@@ -2885,8 +2887,10 @@ app.get('/api/analytics', async (req, res) => {
   try {
     const allSessions = sessions.getAllSessions();
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+    // Medianoche en CDMX (UTC-6, sin DST desde 2023)
+    const todayStrCDMX = now.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    const todayStart = new Date(todayStrCDMX + 'T00:00:00-06:00');
+
     // Determinar periodo según parámetro
     const period = req.query.period || '30d';
     let periodStart, previousPeriodStart, previousPeriodEnd;
