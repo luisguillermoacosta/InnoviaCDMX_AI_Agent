@@ -397,12 +397,16 @@ try {
 
 // Números del staff — el bot no responde a estos números (matching por sufijo)
 let STAFF_PHONES = [];
+// Clientes existentes — el bot ignora estos números silenciosamente
+let EXISTING_CLIENTS = [];
 try {
   const bizConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'business_config.json'), 'utf8'));
   STAFF_PHONES = (bizConfig.staff_phones || []).map(p => p.replace(/\D/g, ''));
+  EXISTING_CLIENTS = (bizConfig.existing_clients || []).map(p => p.replace(/\D/g, ''));
   console.log(`✅ Staff phones cargados: ${STAFF_PHONES.length} números`);
+  console.log(`✅ Clientes existentes cargados: ${EXISTING_CLIENTS.length} números`);
 } catch (error) {
-  console.warn('⚠️  No se pudo cargar staff_phones desde business_config.json');
+  console.warn('⚠️  No se pudo cargar staff_phones/existing_clients desde business_config.json');
 }
 
 // Configuración de Google Calendar
@@ -1956,6 +1960,13 @@ app.post('/webhook', async (req, res) => {
             continue;
           }
 
+          // Ignorar clientes existentes (ya pasaron por el flujo inicial)
+          const isExistingClient = EXISTING_CLIENTS.some(suffix => senderClean.endsWith(suffix));
+          if (isExistingClient) {
+            console.log(`🔕 [CLIENTE EXISTENTE] Número ignorado: ${senderClean}`);
+            continue;
+          }
+
           // Usar debounce para agrupar mensajes rápidos del mismo número
           // (evita respuestas duplicadas cuando el usuario envía varios textos en ráfaga)
           scheduleTextMessage(senderPhone, incomingMessage, {});
@@ -3382,6 +3393,7 @@ app.get('/api/config', async (req, res) => {
       catalogo: businessConfig.catalogo,
       precios: businessConfig.precios,
       staffPhones: businessConfig.staff_phones || [],
+      existingClients: businessConfig.existing_clients || [],
       adminPhone: phoneConfig.adminPhone || ADMIN_PHONE,
       botPhone: phoneConfig.botPhone || process.env.PHONE_NUMBER_ID || process.env.DISPLAY_PHONE_NUMBER || ''
     });
@@ -3394,7 +3406,7 @@ app.get('/api/config', async (req, res) => {
 // PUT /api/config - Actualizar configuración del bot
 app.put('/api/config', async (req, res) => {
   try {
-    const { business, horarios, catalogo, precios, staffPhones, adminPhone, botPhone } = req.body;
+    const { business, horarios, catalogo, precios, staffPhones, existingClients, adminPhone, botPhone } = req.body;
     
     // Leer configuración actual
     const currentConfig = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'business_config.json'), 'utf8'));
@@ -3416,6 +3428,11 @@ app.put('/api/config', async (req, res) => {
       currentConfig.staff_phones = staffPhones.map(p => p.replace(/\D/g, '')).filter(Boolean);
       STAFF_PHONES = currentConfig.staff_phones;
       console.log(`✅ STAFF_PHONES actualizado: ${STAFF_PHONES.length} números`);
+    }
+    if (Array.isArray(existingClients)) {
+      currentConfig.existing_clients = existingClients.map(p => p.replace(/\D/g, '')).filter(Boolean);
+      EXISTING_CLIENTS = currentConfig.existing_clients;
+      console.log(`✅ EXISTING_CLIENTS actualizado: ${EXISTING_CLIENTS.length} números`);
     }
 
     // Guardar configuración actualizada

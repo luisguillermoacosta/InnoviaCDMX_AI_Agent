@@ -9,6 +9,8 @@
     { "fecha": "12-31", "nombre": "Año nuevo" }
   ],
 
+  "existing_clients": [],
+
   "staff_phones": [
     "9179605545",
     "4492107201",

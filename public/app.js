@@ -1411,6 +1411,7 @@ async function loadConfig() {
         document.getElementById('catalogo-link').value = data.catalogo?.link || '';
         document.getElementById('precio-base').value = data.precios?.precio_base || '';
         document.getElementById('staff-phones').value = (data.staffPhones || []).join('\n');
+        document.getElementById('existing-clients').value = (data.existingClients || []).join('\n');
     } catch (error) {
         console.error('Error cargando configuración:', error);
     }
@@ -1861,6 +1862,8 @@ document.getElementById('config-form')?.addEventListener('submit', async (e) => 
             precio_base: parseInt(document.getElementById('precio-base').value) || 0
         },
         staffPhones: document.getElementById('staff-phones').value
+            .split('\n').map(s => s.trim()).filter(Boolean),
+        existingClients: document.getElementById('existing-clients').value
             .split('\n').map(s => s.trim()).filter(Boolean),
         adminPhone: document.getElementById('admin-phone').value,
         botPhone: document.getElementById('bot-phone').value
