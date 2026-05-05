@@ -3122,22 +3122,33 @@ app.get('/api/analytics', async (req, res) => {
       }
       
       // Citas
+      // Use cita_agendada_en (when it was booked) to filter by period,
+      // falling back to ultima_actividad for sessions without that field.
       const hasAppointment = session.etapa === 'cita_agendada';
       if (hasAppointment) {
+        const bookedAt = session.cita_agendada_en
+          ? new Date(session.cita_agendada_en)
+          : new Date(session.ultima_actividad);
+        const appointmentInCurrentPeriod  = bookedAt >= periodStart && bookedAt <= now;
+        const appointmentInPreviousPeriod = bookedAt >= previousPeriodStart && bookedAt < previousPeriodEnd;
+
         conversationsWithAppointment++;
-        totalAppointmentsGenerated++;
-        
-        if (session.appointmentActions?.created) {
+
+        if (appointmentInCurrentPeriod) {
+          totalAppointmentsGenerated++;
+        }
+
+        if (session.appointmentActions?.created && appointmentInCurrentPeriod) {
           successfulAppointments++;
           confirmedAppointments++;
         }
-        
-        if (session.appointmentActions?.edited) {
+
+        if (session.appointmentActions?.edited && appointmentInCurrentPeriod) {
           successfulReschedules++;
           appointmentsRescheduled++;
         }
-        
-        if (session.appointmentActions?.cancelled) {
+
+        if (session.appointmentActions?.cancelled && appointmentInCurrentPeriod) {
           appointmentsCancelled++;
         }
         

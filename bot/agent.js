@@ -625,6 +625,7 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
         if (toolName === 'confirmar_cita' && result.exito) {
           sessionUpdates.calendar_event_id = result.event_id;
           sessionUpdates.etapa = 'cita_agendada';
+          sessionUpdates.cita_agendada_en = new Date().toISOString();
           sessionUpdates.slots_disponibles = null;
           sessionUpdates.fecha_cita = toolArgs.hora_inicio.split('T')[0];
           // Also persist name if provided
