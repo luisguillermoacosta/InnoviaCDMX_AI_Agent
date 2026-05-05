@@ -1,18 +1,94 @@
 const fs = require('fs');
 const path = require('path');
+const pool = require('./db');
 
 /**
  * Business Configuration Module
- * 
- * Reads and exports business configuration from business_config.json
- * All modules should import business config from here, never hardcode business info directly.
+ *
+ * Reads business config from PostgreSQL (bot_config table) so it survives
+ * Railway redeploys. Falls back to business_config.json on first run (seed).
+ *
+ * Sync getters (getBusinessHours, etc.) remain unchanged — they read from the
+ * in-memory `businessConfig` object, which init() populates from the DB.
+ *
+ * New async API:
+ *   await configModule.init()      — call once at server startup
+ *   await configModule.save(obj)   — full replace + persist
+ *   await configModule.patch(obj)  — shallow-merge + persist
+ *   configModule.get()             — synchronous read (after init)
  */
 
 let businessConfig = null;
 let botMessages = null; // Cache for bot messages
 
+// ── DB helpers ──────────────────────────────────────────────────────────────
+
+async function ensureTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bot_config (
+      id         INTEGER PRIMARY KEY DEFAULT 1,
+      data       JSONB   NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+}
+
 /**
- * Load business configuration from JSON file
+ * Load config from DB; seed from JSON on first deploy.
+ * Updates the shared businessConfig object in-place so all sync getters
+ * automatically reflect DB data without any other code changes.
+ */
+async function init() {
+  try {
+    await ensureTable();
+    const result = await pool.query('SELECT data FROM bot_config WHERE id = 1');
+
+    if (result.rows.length > 0) {
+      // Mutate in-place so existing references stay valid
+      Object.assign(businessConfig, result.rows[0].data);
+      console.log('✅ Business config cargado desde DB');
+    } else {
+      // First deploy — seed the DB from the local JSON file
+      await pool.query(
+        `INSERT INTO bot_config (id, data, updated_at) VALUES (1, $1, NOW())`,
+        [JSON.stringify(businessConfig)]
+      );
+      console.log('✅ Business config sembrado desde business_config.json → DB');
+    }
+  } catch (err) {
+    console.error('⚠️  Error cargando config desde DB, usando archivo local:', err.message);
+    // businessConfig was already loaded from JSON — keep using it as fallback
+  }
+}
+
+/** Persist a full config object to DB and update in-memory cache. */
+async function save(newConfig) {
+  Object.assign(businessConfig, newConfig);
+  await pool.query(
+    `INSERT INTO bot_config (id, data, updated_at) VALUES (1, $1, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()`,
+    [JSON.stringify(businessConfig)]
+  );
+}
+
+/** Shallow-merge partial fields and persist. Returns updated config. */
+async function patch(partial) {
+  Object.assign(businessConfig, partial);
+  await pool.query(
+    `INSERT INTO bot_config (id, data, updated_at) VALUES (1, $1, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = $1, updated_at = NOW()`,
+    [JSON.stringify(businessConfig)]
+  );
+  return businessConfig;
+}
+
+/** Synchronous read — valid after init() resolves. */
+function get() {
+  return businessConfig;
+}
+
+/**
+ * Load business configuration from JSON file (initial load at module import)
  * @returns {Object} Business configuration object
  */
 function loadBusinessConfig() {
@@ -24,15 +100,16 @@ function loadBusinessConfig() {
     const configPath = path.join(__dirname, 'business_config.json');
     const configData = fs.readFileSync(configPath, 'utf8');
     businessConfig = JSON.parse(configData);
-    console.log('✅ Business config loaded successfully');
+    console.log('✅ Business config loaded from file');
     return businessConfig;
   } catch (error) {
     console.error('❌ Error loading business_config.json:', error.message);
-    throw new Error(`Failed to load business configuration: ${error.message}`);
+    businessConfig = {};
+    return businessConfig;
   }
 }
 
-// Load config immediately when module is imported
+// Load from JSON immediately so all sync getters work before init() is called
 const config = loadBusinessConfig();
 
 /**
@@ -318,6 +395,12 @@ function getBotMessage(flow, messageId, variables = {}) {
 
 // Export everything
 module.exports = {
+  // DB persistence (async)
+  init,
+  save,
+  patch,
+  get,
+
   // Raw config
   config,
   

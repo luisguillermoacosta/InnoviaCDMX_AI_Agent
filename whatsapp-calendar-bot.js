@@ -12,7 +12,10 @@ const {
   getBusinessAddress,
   getDefaultGreeting,
   getDefaultResponse,
-  getAppointmentConfirmationMessage
+  getAppointmentConfirmationMessage,
+  init: initBizConfig,
+  save: saveBizConfig,
+  get:  getBizConfig
 } = require('./config');
 
 // Import sessions and OpenAI client (legacy, will be replaced)
@@ -396,17 +399,21 @@ try {
 }
 
 // Números del staff — el bot no responde a estos números (matching por sufijo)
-let STAFF_PHONES = [];
 // Clientes existentes — el bot ignora estos números silenciosamente
+// Populated after initBizConfig() resolves at startup (see server init chain below)
+let STAFF_PHONES = [];
 let EXISTING_CLIENTS = [];
-try {
-  const bizConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'business_config.json'), 'utf8'));
-  STAFF_PHONES = (bizConfig.staff_phones || []).map(p => p.replace(/\D/g, ''));
-  EXISTING_CLIENTS = (bizConfig.existing_clients || []).map(p => p.replace(/\D/g, ''));
+
+function loadRuntimePhones() {
+  const biz = getBizConfig() || {};
+  STAFF_PHONES = (biz.staff_phones || []).map(p => p.replace(/\D/g, ''));
+  EXISTING_CLIENTS = (biz.existing_clients || []).map(p => p.replace(/\D/g, ''));
+  if (biz._adminPhone) {
+    ADMIN_PHONE = biz._adminPhone;
+    console.log(`✅ ADMIN_PHONE cargado desde DB: ${ADMIN_PHONE}`);
+  }
   console.log(`✅ Staff phones cargados: ${STAFF_PHONES.length} números`);
   console.log(`✅ Clientes existentes cargados: ${EXISTING_CLIENTS.length} números`);
-} catch (error) {
-  console.warn('⚠️  No se pudo cargar staff_phones/existing_clients desde business_config.json');
 }
 
 // Configuración de Google Calendar
@@ -3369,24 +3376,8 @@ app.get('/api/conversations/:phone', (req, res) => {
 // GET /api/config - Obtener configuración del bot
 app.get('/api/config', async (req, res) => {
   try {
-    const businessConfig = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'business_config.json'), 'utf8'));
-    
-    // Leer configuración de teléfonos (si existe)
-    let phoneConfig = { 
-      adminPhone: ADMIN_PHONE, 
-      botPhone: process.env.PHONE_NUMBER_ID || process.env.DISPLAY_PHONE_NUMBER || '' 
-    };
-    try {
-      const phoneConfigPath = path.join(__dirname, 'phone_config.json');
-      if (fs.existsSync(phoneConfigPath)) {
-        const phoneConfigData = await fs.promises.readFile(phoneConfigPath, 'utf8');
-        const savedConfig = JSON.parse(phoneConfigData);
-        phoneConfig = { ...phoneConfig, ...savedConfig };
-      }
-    } catch (phoneError) {
-      console.warn('⚠️  No se pudo leer phone_config.json, usando valores por defecto');
-    }
-    
+    const businessConfig = getBizConfig() || {};
+
     res.json({
       business: businessConfig.negocio,
       horarios: businessConfig.horarios,
@@ -3394,8 +3385,8 @@ app.get('/api/config', async (req, res) => {
       precios: businessConfig.precios,
       staffPhones: businessConfig.staff_phones || [],
       existingClients: businessConfig.existing_clients || [],
-      adminPhone: phoneConfig.adminPhone || ADMIN_PHONE,
-      botPhone: phoneConfig.botPhone || process.env.PHONE_NUMBER_ID || process.env.DISPLAY_PHONE_NUMBER || ''
+      adminPhone: businessConfig._adminPhone || ADMIN_PHONE,
+      botPhone: businessConfig._botPhone || process.env.PHONE_NUMBER_ID || process.env.DISPLAY_PHONE_NUMBER || ''
     });
   } catch (error) {
     console.error('Error en /api/config:', error);
@@ -3407,23 +3398,15 @@ app.get('/api/config', async (req, res) => {
 app.put('/api/config', async (req, res) => {
   try {
     const { business, horarios, catalogo, precios, staffPhones, existingClients, adminPhone, botPhone } = req.body;
-    
-    // Leer configuración actual
-    const currentConfig = JSON.parse(await fs.promises.readFile(path.join(__dirname, 'business_config.json'), 'utf8'));
-    
-    // Actualizar solo los campos proporcionados
-    if (business) {
-      currentConfig.negocio = { ...currentConfig.negocio, ...business };
-    }
-    if (horarios) {
-      currentConfig.horarios = { ...currentConfig.horarios, ...horarios };
-    }
-    if (catalogo) {
-      currentConfig.catalogo = { ...currentConfig.catalogo, ...catalogo };
-    }
-    if (precios) {
-      currentConfig.precios = { ...currentConfig.precios, ...precios };
-    }
+
+    // Work on a copy of the current in-memory config
+    const currentConfig = { ...(getBizConfig() || {}) };
+
+    if (business)  currentConfig.negocio  = { ...currentConfig.negocio,  ...business  };
+    if (horarios)  currentConfig.horarios  = { ...currentConfig.horarios,  ...horarios  };
+    if (catalogo)  currentConfig.catalogo  = { ...currentConfig.catalogo,  ...catalogo  };
+    if (precios)   currentConfig.precios   = { ...currentConfig.precios,   ...precios   };
+
     if (Array.isArray(staffPhones)) {
       currentConfig.staff_phones = staffPhones.map(p => p.replace(/\D/g, '')).filter(Boolean);
       STAFF_PHONES = currentConfig.staff_phones;
@@ -3435,52 +3418,20 @@ app.put('/api/config', async (req, res) => {
       console.log(`✅ EXISTING_CLIENTS actualizado: ${EXISTING_CLIENTS.length} números`);
     }
 
-    // Guardar configuración actualizada
-    await fs.promises.writeFile(
-      path.join(__dirname, 'business_config.json'),
-      JSON.stringify(currentConfig, null, 2),
-      'utf8'
-    );
-    
-    // Guardar configuración de teléfonos en archivo separado
-    const phoneConfigPath = path.join(__dirname, 'phone_config.json');
-    let phoneConfig = {};
-    
-    // Leer configuración existente si existe
-    try {
-      if (fs.existsSync(phoneConfigPath)) {
-        const existingData = await fs.promises.readFile(phoneConfigPath, 'utf8');
-        phoneConfig = JSON.parse(existingData);
-      }
-    } catch (readError) {
-      console.warn('⚠️  No se pudo leer phone_config.json existente, creando nuevo');
-    }
-    
-    // Actualizar solo los campos proporcionados
-    if (adminPhone !== undefined && adminPhone !== null && adminPhone !== '') {
-      phoneConfig.adminPhone = adminPhone;
+    // Store adminPhone / botPhone inside the config document (underscore prefix = internal)
+    if (adminPhone) {
+      currentConfig._adminPhone = adminPhone;
+      ADMIN_PHONE = adminPhone;
       console.log(`✅ ADMIN_PHONE actualizado a: ${adminPhone}`);
     }
-    
-    if (botPhone !== undefined && botPhone !== null && botPhone !== '') {
-      phoneConfig.botPhone = botPhone;
+    if (botPhone) {
+      currentConfig._botPhone = botPhone;
       console.log(`✅ BOT_PHONE actualizado a: ${botPhone}`);
     }
-    
-    // Guardar configuración de teléfonos
-    await fs.promises.writeFile(
-      phoneConfigPath,
-      JSON.stringify(phoneConfig, null, 2),
-      'utf8'
-    );
-    
-    // Recargar ADMIN_PHONE en memoria si se actualizó
-    if (adminPhone && phoneConfig.adminPhone) {
-      // Actualizar la variable en memoria para que tome efecto inmediatamente
-      ADMIN_PHONE = phoneConfig.adminPhone;
-      console.log(`✅ ADMIN_PHONE actualizado en memoria a: ${ADMIN_PHONE}`);
-    }
-    
+
+    // Persist to DB (updates in-memory cache too via save())
+    await saveBizConfig(currentConfig);
+
     res.json({ success: true, message: 'Configuración actualizada correctamente' });
   } catch (error) {
     console.error('Error en PUT /api/config:', error);
@@ -3557,8 +3508,6 @@ app.put('/api/messages', async (req, res) => {
     console.log('✅ Archivo bot_messages.json guardado correctamente');
     
     // Recargar mensajes en memoria para que los cambios se apliquen inmediatamente
-    // IMPORTANTE: Usar require cache busting para forzar recarga del módulo
-    delete require.cache[require.resolve('./config')];
     const { reloadBotMessages } = require('./config');
     const reloaded = reloadBotMessages();
     
@@ -3575,10 +3524,7 @@ app.put('/api/messages', async (req, res) => {
 // GET /api/faqs - Obtener preguntas frecuentes del bot
 app.get('/api/faqs', async (req, res) => {
   try {
-    const configPath = path.join(__dirname, 'business_config.json');
-    const fileContent = await fs.promises.readFile(configPath, 'utf8');
-    const businessConfig = JSON.parse(fileContent);
-    res.json(businessConfig.faqs || []);
+    res.json((getBizConfig() || {}).faqs || []);
   } catch (error) {
     console.error('Error en /api/faqs:', error);
     res.status(500).json({ error: error.message });
@@ -3592,13 +3538,7 @@ app.put('/api/faqs', async (req, res) => {
     if (!Array.isArray(faqs)) {
       return res.status(400).json({ error: 'Se requiere un array de FAQs' });
     }
-    const configPath = path.join(__dirname, 'business_config.json');
-    const fileContent = await fs.promises.readFile(configPath, 'utf8');
-    const businessConfig = JSON.parse(fileContent);
-    businessConfig.faqs = faqs;
-    await fs.promises.writeFile(configPath, JSON.stringify(businessConfig, null, 2), 'utf8');
-    // Reload config cache
-    delete require.cache[require.resolve('./config')];
+    await saveBizConfig({ ...(getBizConfig() || {}), faqs });
     console.log('✅ FAQs actualizadas correctamente');
     res.json({ success: true, message: 'FAQs actualizadas correctamente' });
   } catch (error) {
@@ -3848,7 +3788,8 @@ const PORT = process.env.PORT || 3000;
 
 // Inicializar Google Calendar antes de iniciar el servidor
 initGoogleAuth()
-  .then(() => Promise.all([sessions.init(), sheetsService.init()]))
+  .then(() => Promise.all([sessions.init(), sheetsService.init(), initBizConfig()]))
+  .then(() => loadRuntimePhones())
   .then(() => {
   app.listen(PORT, () => {
     console.log(`\n🚀 =====================================`);
