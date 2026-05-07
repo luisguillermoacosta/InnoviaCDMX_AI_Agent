@@ -1283,7 +1283,8 @@ async function embudoOpenConv(phone) {
     document.getElementById('embudo-panel-name').textContent  = name;
     document.getElementById('embudo-panel-phone').textContent = formatPhone(phone);
     updateEmbudoPauseBtn(paused);
-    updateEmbudoResolveBtn(escalated);
+    const alreadyResolved = !!(conv?.resolvedByAgent || conv?.hasAppointment);
+    updateEmbudoResolveBtn(!alreadyResolved);
 
     // Render messages (reuse same rendering as Conversaciones tab)
     const msgs = document.getElementById('embudo-panel-messages');
@@ -1393,10 +1394,10 @@ function embudoReplyKeydown(e) {
     }
 }
 
-function updateEmbudoResolveBtn(escalated) {
+function updateEmbudoResolveBtn(show) {
     const btn = document.getElementById('embudo-panel-resolve-btn');
     if (!btn) return;
-    btn.style.display = 'inline-flex'; // visible en todas las columnas
+    btn.style.display = show ? 'inline-flex' : 'none';
 }
 
 async function embudoResolve() {
