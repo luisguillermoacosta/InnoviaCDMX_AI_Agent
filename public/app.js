@@ -61,8 +61,9 @@ function initTabs() {
             btn.classList.add('active');
             document.getElementById(targetTab).classList.add('active');
             
-            // Detener auto-refresh de logs si se cambia de pestaña
+            // Detener auto-refresh de logs y embudo si se cambia de pestaña
             stopLogsAutoRefresh();
+            if (targetTab !== 'embudo') stopEmbudoPanelRefresh();
             
             // Cargar datos según el tab
             if (targetTab === 'analytics') {
@@ -1121,6 +1122,47 @@ async function togglePauseConversation(phone, currentlyPaused) {
 
 // ── Embudo (Kanban) ───────────────────────────────────────────────────────
 
+let embudoPanelRefreshInterval = null;
+
+function startEmbudoPanelRefresh() {
+    stopEmbudoPanelRefresh();
+    embudoPanelRefreshInterval = setInterval(async () => {
+        if (!embudoActivePanelPhone) return;
+        try {
+            const res  = await fetch(`/api/conversations/${embudoActivePanelPhone}`);
+            const data = await res.json();
+            const msgs = document.getElementById('embudo-panel-messages');
+            if (!msgs || !data.messages) return;
+
+            // Preserve scroll: only auto-scroll if user is already near the bottom
+            const isAtBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
+
+            msgs.innerHTML = data.messages.map(msg => {
+                if (msg.direction === 'system') {
+                    return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+                        <div style="flex:1;height:1px;background:var(--border-color);"></div>
+                        <div style="font-size:11px;color:#888;background:var(--bg-secondary);padding:3px 10px;border-radius:12px;white-space:nowrap;">${escapeHtml(msg.message)} · ${formatDate(msg.timestamp)}</div>
+                        <div style="flex:1;height:1px;background:var(--border-color);"></div>
+                    </div>`;
+                }
+                return `<div class="conversation-message ${msg.direction}">
+                    <div>${escapeHtml(msg.message)}</div>
+                    <div class="message-time">${formatDate(msg.timestamp)}</div>
+                </div>`;
+            }).join('');
+
+            if (isAtBottom) msgs.scrollTop = msgs.scrollHeight;
+        } catch (e) { /* silently ignore refresh errors */ }
+    }, 5000);
+}
+
+function stopEmbudoPanelRefresh() {
+    if (embudoPanelRefreshInterval) {
+        clearInterval(embudoPanelRefreshInterval);
+        embudoPanelRefreshInterval = null;
+    }
+}
+
 async function loadEmbudo() {
     try {
         const [convRes, tasksRes] = await Promise.all([
@@ -1248,8 +1290,9 @@ async function embudoOpenConv(phone) {
         msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // Open the panel
+    // Open the panel and start auto-refresh
     document.getElementById('embudo-layout').classList.add('panel-open');
+    startEmbudoPanelRefresh();
 
     // Highlight the selected card
     document.querySelectorAll('.embudo-card').forEach(c => c.classList.remove('embudo-card-active'));
@@ -1258,6 +1301,7 @@ async function embudoOpenConv(phone) {
 }
 
 function embudoClosePanel() {
+    stopEmbudoPanelRefresh();
     embudoActivePanelPhone = null;
     document.getElementById('embudo-layout').classList.remove('panel-open');
     document.querySelectorAll('.embudo-card').forEach(c => c.classList.remove('embudo-card-active'));
