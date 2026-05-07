@@ -3410,8 +3410,24 @@ app.get('/api/conversations', (req, res) => {
       const hasFlag    = !!session.escalated_to_human;
       const hasPending = pendingTaskPhones.has(cleanPhone);
 
-      // If a pending task exists but the flag isn't set yet, backfill it
+      // Backfill 1: tarea pendiente activa sin flag
       if (hasPending && !hasFlag && !session.resolved_by_agent) {
+        sessions.updateSession(cleanPhone, { escalated_to_human: true, resolved_by_agent: false });
+      }
+
+      // Backfill 2: historial contiene mensaje del bot con frases de escalación
+      // (cubre conversaciones antiguas donde el flag nunca se seteó)
+      const ESCALATION_PHRASES = [
+        'pondrán en contacto', 'se comunicará', 'un agente', 'una asesora te',
+        'hemos tomado nota', 'tomamos nota', 'te contactaremos', 'registrado tu solicitud',
+        'staff te contact'
+      ];
+      const hasEscalationInHistory = !hasFlag && !session.resolved_by_agent &&
+        (session.historial || []).some(m =>
+          m.role === 'assistant' &&
+          ESCALATION_PHRASES.some(p => (m.content || '').toLowerCase().includes(p))
+        );
+      if (hasEscalationInHistory) {
         sessions.updateSession(cleanPhone, { escalated_to_human: true, resolved_by_agent: false });
       }
 
