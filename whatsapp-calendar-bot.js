@@ -3947,8 +3947,8 @@ async function runRecoveryJob() {
   if (!isCDMXAllowedSlot()) return; // silencioso fuera de slot
 
   const now = Date.now();
-  const MIN_ELAPSED = 15 * 60 * 60 * 1000; // 15 horas
-  const MAX_ELAPSED = 23 * 60 * 60 * 1000; // 23 horas
+  const MIN_ELAPSED = 14 * 60 * 60 * 1000;        // 14 horas (cubre el gap nocturno)
+  const MAX_ELAPSED = 23.5 * 60 * 60 * 1000;      // 23.5 horas (30 min antes del límite de WhatsApp)
 
   const allSessions = sessions.getAllSessions();
   const eligible = allSessions.filter(({ session }) => {
