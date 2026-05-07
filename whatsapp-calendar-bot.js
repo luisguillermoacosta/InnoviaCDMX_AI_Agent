@@ -1640,11 +1640,15 @@ app.post('/admin/send-human-message', async (req, res) => {
 
     const cleanPhone = phone.replace(/\D/g, '');
 
-    // Use the module-level whatsappPhoneNumberId (populated from webhook metadata)
-    if (!whatsappPhoneNumberId) {
-      return res.status(500).json({ error: 'Phone number ID no disponible aún. Espera a que llegue un mensaje al bot primero.' });
+    // Use module-level whatsappPhoneNumberId (set from webhook), fallback to env vars
+    const phoneNumberId = whatsappPhoneNumberId
+      || process.env.WHATSAPP_PHONE_NUMBER_ID
+      || process.env.PHONE_NUMBER_ID
+      || '';
+    if (!phoneNumberId) {
+      return res.status(500).json({ error: 'WHATSAPP_PHONE_NUMBER_ID no está configurado. Agrégalo en Railway → Variables.' });
     }
-    const endpoint = `https://api.chakrahq.com/v1/ext/plugin/whatsapp/${CHAKRA_PLUGIN_ID}/api/${CHAKRA_WHATSAPP_API_VERSION}/${whatsappPhoneNumberId}/messages`;
+    const endpoint = `https://api.chakrahq.com/v1/ext/plugin/whatsapp/${CHAKRA_PLUGIN_ID}/api/${CHAKRA_WHATSAPP_API_VERSION}/${phoneNumberId}/messages`;
 
     const cleanApiKey = CHAKRA_API_KEY.trim().replace(/\s+/g, '');
     await axios.post(endpoint, {
