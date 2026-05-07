@@ -1279,6 +1279,14 @@ async function embudoOpenConv(phone) {
         });
     }
 
+    // Show only the column that matches this conversation, hide the others
+    const resolved = !!(conv?.resolvedByAgent || conv?.hasAppointment);
+    const activeCol = resolved ? 'resuelta' : escalated ? 'escalada' : 'bot';
+    ['bot', 'escalada', 'resuelta'].forEach(col => {
+        const el = document.getElementById(`embudo-col-${col}`)?.closest('.embudo-column');
+        if (el) el.style.display = col === activeCol ? '' : 'none';
+    });
+
     // Open the panel and start auto-refresh
     document.getElementById('embudo-layout').classList.add('panel-open');
     startEmbudoPanelRefresh();
@@ -1294,6 +1302,11 @@ function embudoClosePanel() {
     embudoActivePanelPhone = null;
     document.getElementById('embudo-layout').classList.remove('panel-open');
     document.querySelectorAll('.embudo-card').forEach(c => c.classList.remove('embudo-card-active'));
+    // Restore all columns
+    ['bot', 'escalada', 'resuelta'].forEach(col => {
+        const el = document.getElementById(`embudo-col-${col}`)?.closest('.embudo-column');
+        if (el) el.style.display = '';
+    });
 }
 
 function updateEmbudoPauseBtn(paused) {
