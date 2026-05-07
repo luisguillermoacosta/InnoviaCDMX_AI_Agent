@@ -118,6 +118,17 @@ function addToHistory(phone, role, content) {
     role = 'user';
   }
 
+  // Deduplicar: ignorar si el último mensaje del mismo rol es idéntico
+  // (evita duplicados cuando el usuario reenvía el mismo mensaje)
+  const lastSameRole = [...session.historial].reverse().find(m => m.role === role);
+  if (lastSameRole && lastSameRole.content === content && role === 'user') {
+    const secondsAgo = (Date.now() - new Date(lastSameRole.timestamp).getTime()) / 1000;
+    if (secondsAgo < 60) {
+      console.log(`🔁 [DEDUP] Mensaje duplicado ignorado para ${phone}: "${content.slice(0, 40)}"`);
+      return;
+    }
+  }
+
   session.historial.push({
     role,
     content,
