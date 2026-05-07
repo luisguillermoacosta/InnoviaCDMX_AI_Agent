@@ -142,35 +142,55 @@
                 </div>
                 <button onclick="loadEmbudo()" class="btn-primary" style="padding:8px 16px;">🔄 Actualizar</button>
             </div>
-            <div class="embudo-board" id="embudo-board">
-                <div class="embudo-column">
-                    <div class="embudo-column-header bot-header">
-                        <span class="embudo-column-icon">🤖</span>
-                        <span class="embudo-column-title">Con el Bot</span>
-                        <span class="embudo-column-count" id="embudo-count-bot">0</span>
+            <div class="embudo-layout" id="embudo-layout">
+                <!-- Kanban columns -->
+                <div class="embudo-board" id="embudo-board">
+                    <div class="embudo-column">
+                        <div class="embudo-column-header bot-header">
+                            <span class="embudo-column-icon">🤖</span>
+                            <span class="embudo-column-title">Con el Bot</span>
+                            <span class="embudo-column-count" id="embudo-count-bot">0</span>
+                        </div>
+                        <div class="embudo-cards" id="embudo-col-bot">
+                            <p class="loading-text">Cargando...</p>
+                        </div>
                     </div>
-                    <div class="embudo-cards" id="embudo-col-bot">
-                        <p class="loading-text">Cargando...</p>
+                    <div class="embudo-column">
+                        <div class="embudo-column-header escalada-header">
+                            <span class="embudo-column-icon">🙋</span>
+                            <span class="embudo-column-title">Escaladas a Humano</span>
+                            <span class="embudo-column-count" id="embudo-count-escalada">0</span>
+                        </div>
+                        <div class="embudo-cards" id="embudo-col-escalada">
+                            <p class="loading-text">Cargando...</p>
+                        </div>
+                    </div>
+                    <div class="embudo-column">
+                        <div class="embudo-column-header resuelta-header">
+                            <span class="embudo-column-icon">✅</span>
+                            <span class="embudo-column-title">Cita Agendada</span>
+                            <span class="embudo-column-count" id="embudo-count-resuelta">0</span>
+                        </div>
+                        <div class="embudo-cards" id="embudo-col-resuelta">
+                            <p class="loading-text">Cargando...</p>
+                        </div>
                     </div>
                 </div>
-                <div class="embudo-column">
-                    <div class="embudo-column-header escalada-header">
-                        <span class="embudo-column-icon">🙋</span>
-                        <span class="embudo-column-title">Escaladas a Humano</span>
-                        <span class="embudo-column-count" id="embudo-count-escalada">0</span>
+
+                <!-- Side panel: conversation detail -->
+                <div class="embudo-side-panel" id="embudo-panel">
+                    <div class="embudo-panel-header">
+                        <div>
+                            <div class="embudo-panel-name" id="embudo-panel-name">—</div>
+                            <div class="embudo-panel-phone" id="embudo-panel-phone">—</div>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <button id="embudo-panel-pause-btn" class="embudo-btn embudo-btn-pause" onclick="embudoPanelTogglePause()" style="padding:6px 12px;font-size:12px;">⏸ Pausar</button>
+                            <button onclick="embudoClosePanel()" style="background:none;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;padding:4px 8px;line-height:1;">✕</button>
+                        </div>
                     </div>
-                    <div class="embudo-cards" id="embudo-col-escalada">
-                        <p class="loading-text">Cargando...</p>
-                    </div>
-                </div>
-                <div class="embudo-column">
-                    <div class="embudo-column-header resuelta-header">
-                        <span class="embudo-column-icon">✅</span>
-                        <span class="embudo-column-title">Cita Agendada</span>
-                        <span class="embudo-column-count" id="embudo-count-resuelta">0</span>
-                    </div>
-                    <div class="embudo-cards" id="embudo-col-resuelta">
-                        <p class="loading-text">Cargando...</p>
+                    <div class="embudo-panel-messages" id="embudo-panel-messages">
+                        <p class="loading-text">Selecciona una conversación</p>
                     </div>
                 </div>
             </div>

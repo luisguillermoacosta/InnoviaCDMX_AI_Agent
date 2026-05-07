@@ -1191,7 +1191,7 @@ function renderEmbudoColumn(containerId, convs, type) {
             : '';
 
         return `
-        <div class="embudo-card" onclick="embudoOpenConv('${rawPhone}')">
+        <div class="embudo-card" data-phone="${rawPhone}" onclick="embudoOpenConv('${rawPhone}')">
             <div class="embudo-card-name">${name}</div>
             <div class="embudo-card-phone">📞 ${phone}</div>
             <div class="embudo-card-meta">
@@ -1203,23 +1203,105 @@ function renderEmbudoColumn(containerId, convs, type) {
     }).join('');
 }
 
-function embudoOpenConv(phone) {
-    // Switch to Conversaciones tab and open this conversation
-    const tabBtn = document.querySelector('[data-tab="conversations"]');
-    if (tabBtn) tabBtn.click();
-    setTimeout(() => loadConversationMessages(phone), 300);
+let embudoActivePanelPhone = null;
+let embudoActivePanelPaused = false;
+
+async function embudoOpenConv(phone) {
+    embudoActivePanelPhone = phone;
+
+    // Find conv data for header
+    const convRes = await fetch(`/api/conversations/${phone}`);
+    const data = await convRes.json();
+
+    // Find name/paused from cache — re-fetch conversations if needed
+    const allRes = await fetch('/api/conversations');
+    const { conversations } = await allRes.json();
+    const conv = conversations.find(c => (c.phone||'').replace(/\D/g,'') === phone.replace(/\D/g,''));
+
+    const name   = conv?.nombre || formatPhone(phone);
+    const paused = !!(conv?.botPaused);
+    embudoActivePanelPaused = paused;
+
+    // Update panel header
+    document.getElementById('embudo-panel-name').textContent  = name;
+    document.getElementById('embudo-panel-phone').textContent = formatPhone(phone);
+    updateEmbudoPauseBtn(paused);
+
+    // Render messages (reuse same rendering as Conversaciones tab)
+    const msgs = document.getElementById('embudo-panel-messages');
+    if (!data.messages || data.messages.length === 0) {
+        msgs.innerHTML = '<p class="loading-text">Sin mensajes</p>';
+    } else {
+        msgs.innerHTML = data.messages.map(msg => {
+            if (msg.direction === 'system') {
+                return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+                    <div style="flex:1;height:1px;background:var(--border-color);"></div>
+                    <div style="font-size:11px;color:#888;background:var(--bg-secondary);padding:3px 10px;border-radius:12px;white-space:nowrap;">${escapeHtml(msg.message)} · ${formatDate(msg.timestamp)}</div>
+                    <div style="flex:1;height:1px;background:var(--border-color);"></div>
+                </div>`;
+            }
+            return `<div class="conversation-message ${msg.direction}">
+                <div>${escapeHtml(msg.message)}</div>
+                <div class="message-time">${formatDate(msg.timestamp)}</div>
+            </div>`;
+        }).join('');
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    // Open the panel
+    document.getElementById('embudo-layout').classList.add('panel-open');
+
+    // Highlight the selected card
+    document.querySelectorAll('.embudo-card').forEach(c => c.classList.remove('embudo-card-active'));
+    const cards = document.querySelectorAll('.embudo-card');
+    cards.forEach(c => { if (c.getAttribute('data-phone') === phone) c.classList.add('embudo-card-active'); });
+}
+
+function embudoClosePanel() {
+    embudoActivePanelPhone = null;
+    document.getElementById('embudo-layout').classList.remove('panel-open');
+    document.querySelectorAll('.embudo-card').forEach(c => c.classList.remove('embudo-card-active'));
+}
+
+function updateEmbudoPauseBtn(paused) {
+    const btn = document.getElementById('embudo-panel-pause-btn');
+    if (!btn) return;
+    if (paused) {
+        btn.textContent = '▶ Reactivar';
+        btn.className = 'embudo-btn embudo-btn-resume';
+        btn.style.cssText = 'padding:6px 12px;font-size:12px;';
+    } else {
+        btn.textContent = '⏸ Pausar';
+        btn.className = 'embudo-btn embudo-btn-pause';
+        btn.style.cssText = 'padding:6px 12px;font-size:12px;';
+    }
+}
+
+async function embudoPanelTogglePause() {
+    if (!embudoActivePanelPhone) return;
+    try {
+        if (embudoActivePanelPaused) {
+            await fetch('/admin/resume-bot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: embudoActivePanelPhone }) });
+            embudoActivePanelPaused = false;
+        } else {
+            await fetch('/admin/pause-bot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: embudoActivePanelPhone, minutes: 120 }) });
+            embudoActivePanelPaused = true;
+        }
+        updateEmbudoPauseBtn(embudoActivePanelPaused);
+        loadEmbudo(); // refresh column counts/badges
+    } catch(e) { console.error(e); }
 }
 
 async function embudoPause(phone) {
     try {
-        await fetch(`/api/pause/${phone}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: 120 }) });
+        await fetch('/admin/pause-bot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, minutes: 120 }) });
         loadEmbudo();
     } catch(e) { console.error(e); }
 }
 
 async function embudoResume(phone) {
     try {
-        await fetch(`/api/resume/${phone}`, { method: 'POST' });
+        await fetch('/admin/resume-bot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
         loadEmbudo();
     } catch(e) { console.error(e); }
 }
