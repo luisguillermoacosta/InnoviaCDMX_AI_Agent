@@ -1284,7 +1284,8 @@ async function embudoOpenConv(phone) {
     document.getElementById('embudo-panel-name').textContent  = name;
     document.getElementById('embudo-panel-phone').textContent = formatPhone(phone);
     updateEmbudoPauseBtn(paused);
-    const alreadyResolved = !!(conv?.resolvedByAgent || conv?.hasAppointment);
+    // Escalada tiene prioridad — aunque tenga cita, si está escalada el botón aparece
+    const alreadyResolved = !conv?.escalatedToHuman && !!(conv?.resolvedByAgent || conv?.hasAppointment);
     updateEmbudoResolveBtn(!alreadyResolved);
 
     // Render messages (reuse same rendering as Conversaciones tab)
