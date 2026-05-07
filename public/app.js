@@ -474,22 +474,25 @@ function updateConversationTypeChart(etapaDistribution) {
     const ctx = document.getElementById('conversation-type-chart');
     if (!ctx) return;
 
-    const dist = etapaDistribution || { primer_contacto: 0, interesada: 0, cita_agendada: 0 };
+    const dist = etapaDistribution || { primer_contacto: 0, interesada: 0, cita_agendada: 0, recuperacion: 0 };
 
-    const labels = ['Primer contacto', 'Interesadas', 'Cita agendada'];
+    const labels = ['Primer contacto', 'Interesadas', 'Recuperación', 'Cita agendada'];
     const values = [
         dist.primer_contacto || 0,
         dist.interesada      || 0,
+        dist.recuperacion    || 0,
         dist.cita_agendada   || 0
     ];
     const total = values.reduce((a, b) => a + b, 0);
 
     // Si no hay sesiones todavía, mostrar placeholder visual equitativo
-    const displayValues = total === 0 ? [1, 1, 1] : values;
-    const colors = ['#00f5ff', '#ff6b35', '#00ff88'];
+    const displayValues = total === 0 ? [1, 1, 1, 1] : values;
+    const colors = ['#00f5ff', '#ff6b35', '#fbbf24', '#00ff88'];
 
     if (charts.conversationType) {
-        charts.conversationType.data.datasets[0].data = displayValues;
+        charts.conversationType.data.labels   = labels;
+        charts.conversationType.data.datasets[0].data   = displayValues;
+        charts.conversationType.data.datasets[0].backgroundColor = colors;
         charts.conversationType.options.plugins.tooltip.callbacks.label = function(context) {
             if (total === 0) return ' Sin sesiones aún';
             const pct = ((context.parsed / total) * 100).toFixed(1);

@@ -3314,8 +3314,13 @@ app.get('/api/analytics', async (req, res) => {
     const peakAppointmentHour = Object.entries(appointmentsByHour).sort((a, b) => b[1] - a[1])[0];
 
     // Distribución de etapas (todas las sesiones, sin filtro de periodo)
-    const etapaDistribution = { primer_contacto: 0, interesada: 0, cita_agendada: 0 };
+    const etapaDistribution = { primer_contacto: 0, interesada: 0, cita_agendada: 0, recuperacion: 0 };
     sessions.getAllSessions().forEach(({ session: s }) => {
+      // Sesiones con mensaje de recovery enviado cuentan en su propio segmento
+      if (s.recovery_sent_at && ['primer_contacto', 'interesada'].includes(s.etapa || 'primer_contacto')) {
+        etapaDistribution.recuperacion++;
+        return;
+      }
       const etapa = s.etapa || 'primer_contacto';
       if (etapaDistribution[etapa] !== undefined) {
         etapaDistribution[etapa]++;
