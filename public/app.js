@@ -1223,7 +1223,7 @@ function renderEmbudoColumn(containerId, convs, type) {
         const badges = [];
         if (c.botPaused)       badges.push(`<span class="embudo-badge badge-paused">⏸ Pausado</span>`);
         if (c.fechaBoda)       badges.push(`<span class="embudo-badge badge-boda">💒 ${escapeHtml(c.fechaBoda)}</span>`);
-        if (c.recoverySentAt)  badges.push(`<span class="embudo-badge badge-recovery">🔄 Seguimiento</span>`);
+        if (c.recoverySentAt)  badges.push(`<span class="embudo-badge badge-recovery">🔄 Recuperando</span>`);
         if (type === 'escalada') badges.push(`<span class="embudo-badge badge-escalada">🙋 Asesor</span>`);
         if (type === 'resuelta' && c.hasAppointment)  badges.push(`<span class="embudo-badge badge-cita">📅 Cita</span>`);
         if (type === 'resuelta' && !c.hasAppointment) badges.push(`<span class="embudo-badge badge-resolved">✅ Resuelta</span>`);
