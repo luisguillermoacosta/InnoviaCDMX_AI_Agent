@@ -1084,12 +1084,20 @@ function scheduleImageMessage(phone, descripcion, sessionData) {
       historial: queued.sessionData.historial
     });
 
+    // Guardar en historial para que aparezca en el dashboard
+    const cleanPhone = phone.replace(/\D/g, '');
+    const historyLabel = count === 1
+      ? '📷 [Imagen enviada por el usuario]'
+      : `📷 [${count} imágenes enviadas por el usuario]`;
+    sessions.addToHistory(cleanPhone, 'user', historyLabel);
+
     // Una sola respuesta al usuario
     const reply = count === 1
       ? 'Recibí tu imagen 📎. Un miembro de nuestro equipo la revisará y se pondrá en contacto contigo a la brevedad. 🙏'
       : `Recibí tus ${count} imágenes 📎. Un miembro de nuestro equipo las revisará y se pondrá en contacto contigo a la brevedad. 🙏`;
 
     await sendWhatsAppMessage(phone, reply);
+    sessions.addToHistory(cleanPhone, 'assistant', reply);
   }, MESSAGE_DEBOUNCE_MS);
 
   pendingImageMessages.get(phone).timer = timer;
@@ -2057,6 +2065,20 @@ app.post('/webhook', async (req, res) => {
           clientName,
           historial: imgSession.historial || []
         });
+      }
+      // Manejar otros tipos de media (documento, video, audio, sticker)
+      else if (['document', 'video', 'audio', 'sticker', 'voice'].includes(message.type)) {
+        const mediaLabels = {
+          document: '📄 [Documento enviado por el usuario]',
+          video:    '🎥 [Video enviado por el usuario]',
+          audio:    '🎵 [Audio enviado por el usuario]',
+          voice:    '🎤 [Nota de voz enviada por el usuario]',
+          sticker:  '😄 [Sticker enviado por el usuario]'
+        };
+        const label = mediaLabels[message.type] || `📎 [Archivo enviado por el usuario]`;
+        const cleanPhone = senderPhone.replace(/\D/g, '');
+        sessions.addToHistory(cleanPhone, 'user', label);
+        console.log(`📎 Media recibida (${message.type}) de ${senderPhone} — registrado en historial.`);
       }
       // Manejar respuestas de botones interactivos
       else if (message.type === 'interactive' && message.interactive) {
