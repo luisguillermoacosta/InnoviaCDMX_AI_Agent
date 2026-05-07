@@ -1313,8 +1313,10 @@ async function embudoOpenConv(phone) {
     }
 
     // Show only the column that matches this conversation, hide the others
-    const resolved = !!(conv?.resolvedByAgent || conv?.hasAppointment);
-    const activeCol = resolved ? 'resuelta' : escalated ? 'escalada' : 'bot';
+    // Misma prioridad que loadEmbudo: escalada > resuelta/agendada > bot
+    const activeCol = escalated ? 'escalada'
+                    : (conv?.resolvedByAgent || conv?.hasAppointment) ? 'resuelta'
+                    : 'bot';
     ['bot', 'escalada', 'resuelta'].forEach(col => {
         const el = document.getElementById(`embudo-col-${col}`)?.closest('.embudo-column');
         if (el) el.style.display = col === activeCol ? '' : 'none';
