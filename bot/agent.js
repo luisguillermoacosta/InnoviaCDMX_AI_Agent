@@ -689,7 +689,7 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
     const replyMentionsEscalation = escalationPhrases.some(p => replyLower.includes(p));
 
     if (replyMentionsEscalation && !escalationToolWasCalled) {
-      console.log('⚠️  [ESCALATION NET] El reply menciona escalamiento pero el tool no fue llamado — guardando en Sheets');
+      console.log('⚠️  [ESCALATION NET] El reply menciona escalamiento pero el tool no fue llamado — guardando en Sheets y seteando flag');
       const clientName = getClientName(session) || '';
       const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content || '';
       logPendingTask({
@@ -698,6 +698,9 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
         message: lastUserMsg,
         historial: session.historial || []
       });
+      // Setear flag igual que en el tool handler para que el Embudo lo refleje de inmediato
+      const sessionsModule = require('../sessions');
+      sessionsModule.updateSession(phone, { escalated_to_human: true, resolved_by_agent: false });
     }
 
     return { reply, sessionUpdates };
