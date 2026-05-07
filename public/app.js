@@ -69,6 +69,8 @@ function initTabs() {
                 loadAnalytics();
             } else if (targetTab === 'conversations') {
                 loadConversations();
+            } else if (targetTab === 'embudo') {
+                loadEmbudo();
             } else if (targetTab === 'appointments') {
                 loadAppointments();
             } else if (targetTab === 'pending-tasks') {
@@ -1115,6 +1117,122 @@ async function togglePauseConversation(phone, currentlyPaused) {
     } catch (err) {
         console.error('Error al cambiar pausa:', err);
     }
+}
+
+// ── Embudo (Kanban) ───────────────────────────────────────────────────────
+
+async function loadEmbudo() {
+    try {
+        const [convRes, tasksRes] = await Promise.all([
+            fetch('/api/conversations'),
+            fetch('/api/pending-tasks')
+        ]);
+        const { conversations } = await convRes.json();
+        const { tasks } = await tasksRes.json();
+
+        // Build a set of phones that have a pending escalation task
+        const escalatedPhones = new Set(
+            (tasks || [])
+                .filter(t => t.estado === 'Pendiente')
+                .map(t => (t.telefono || '').replace(/\D/g, ''))
+        );
+
+        const bot      = [];
+        const escalada = [];
+        const resuelta = [];
+
+        (conversations || []).forEach(c => {
+            const phone = (c.phone || '').replace(/\D/g, '');
+            if (c.hasAppointment) {
+                resuelta.push(c);
+            } else if (escalatedPhones.has(phone)) {
+                escalada.push(c);
+            } else {
+                bot.push(c);
+            }
+        });
+
+        document.getElementById('embudo-count-bot').textContent      = bot.length;
+        document.getElementById('embudo-count-escalada').textContent  = escalada.length;
+        document.getElementById('embudo-count-resuelta').textContent  = resuelta.length;
+
+        renderEmbudoColumn('embudo-col-bot',      bot,      'bot');
+        renderEmbudoColumn('embudo-col-escalada', escalada, 'escalada');
+        renderEmbudoColumn('embudo-col-resuelta', resuelta, 'resuelta');
+
+    } catch (err) {
+        console.error('Error cargando embudo:', err);
+    }
+}
+
+function renderEmbudoColumn(containerId, convs, type) {
+    const el = document.getElementById(containerId);
+    if (!convs.length) {
+        el.innerHTML = '<p class="loading-text" style="padding:8px 0;">Sin conversaciones</p>';
+        return;
+    }
+
+    el.innerHTML = convs.map(c => {
+        const name    = escapeHtml(c.nombre || 'Sin nombre');
+        const phone   = formatPhone(c.phone || '');
+        const rawPhone = (c.phone || '').replace(/\D/g, '');
+        const timeAgo = c.lastActivity ? relativeTime(new Date(c.lastActivity)) : '—';
+
+        const badges = [];
+        if (c.botPaused)     badges.push(`<span class="embudo-badge badge-paused">⏸ Pausado</span>`);
+        if (c.fechaBoda)     badges.push(`<span class="embudo-badge badge-boda">💒 ${escapeHtml(c.fechaBoda)}</span>`);
+        if (type === 'escalada') badges.push(`<span class="embudo-badge badge-escalada">🙋 Asesor</span>`);
+        if (type === 'resuelta') badges.push(`<span class="embudo-badge badge-cita">✅ Cita</span>`);
+
+        const pauseBtn = type === 'bot'
+            ? c.botPaused
+                ? `<button class="embudo-btn embudo-btn-resume" onclick="event.stopPropagation(); embudoResume('${rawPhone}')">▶ Reactivar</button>`
+                : `<button class="embudo-btn embudo-btn-pause"  onclick="event.stopPropagation(); embudoPause('${rawPhone}')">⏸ Pausar</button>`
+            : '';
+
+        return `
+        <div class="embudo-card" onclick="embudoOpenConv('${rawPhone}')">
+            <div class="embudo-card-name">${name}</div>
+            <div class="embudo-card-phone">📞 ${phone}</div>
+            <div class="embudo-card-meta">
+                <span class="embudo-card-time">⏱ ${timeAgo}</span>
+                <span style="display:flex;gap:4px;flex-wrap:wrap;">${badges.join('')}</span>
+            </div>
+            ${pauseBtn ? `<div class="embudo-card-action">${pauseBtn}<button class="embudo-btn embudo-btn-view" onclick="event.stopPropagation(); embudoOpenConv('${rawPhone}')">💬 Ver chat</button></div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function embudoOpenConv(phone) {
+    // Switch to Conversaciones tab and open this conversation
+    const tabBtn = document.querySelector('[data-tab="conversations"]');
+    if (tabBtn) tabBtn.click();
+    setTimeout(() => loadConversationMessages(phone), 300);
+}
+
+async function embudoPause(phone) {
+    try {
+        await fetch(`/api/pause/${phone}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: 120 }) });
+        loadEmbudo();
+    } catch(e) { console.error(e); }
+}
+
+async function embudoResume(phone) {
+    try {
+        await fetch(`/api/resume/${phone}`, { method: 'POST' });
+        loadEmbudo();
+    } catch(e) { console.error(e); }
+}
+
+function relativeTime(date) {
+    const diff = Date.now() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)   return 'ahora';
+    if (mins < 60)  return `hace ${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return `hace ${hrs}h`;
+    const days = Math.floor(hrs / 24);
+    return `hace ${days}d`;
 }
 
 // Cargar citas — ordenadas por fecha en que se agendaron (más reciente arriba),

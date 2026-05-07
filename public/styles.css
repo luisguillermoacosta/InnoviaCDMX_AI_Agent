@@ -1515,3 +1515,151 @@ body {
         margin-bottom: 2px;
     }
 }
+
+/* ── Embudo (Kanban) ──────────────────────────────────────────────────────── */
+
+.embudo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.embudo-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.embudo-column {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 300px;
+}
+
+.embudo-column-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.bot-header      { background: rgba(99, 102, 241, 0.15); border-bottom: 2px solid #6366f1; }
+.escalada-header { background: rgba(239, 68, 68, 0.12);  border-bottom: 2px solid #ef4444; }
+.resuelta-header { background: rgba(34, 197, 94, 0.12);  border-bottom: 2px solid #22c55e; }
+
+.embudo-column-icon  { font-size: 16px; }
+.embudo-column-title { flex: 1; color: var(--text-primary); }
+
+.embudo-column-count {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.embudo-cards {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.embudo-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.embudo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.embudo-card-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.embudo-card-phone {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.embudo-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.embudo-card-time {
+    font-size: 11px;
+    color: var(--text-light);
+}
+
+.embudo-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge-paused   { background: rgba(234,179,8,0.2);  color: #ca8a04; }
+.badge-boda     { background: rgba(99,102,241,0.15); color: #818cf8; }
+.badge-escalada { background: rgba(239,68,68,0.15);  color: #f87171; }
+.badge-cita     { background: rgba(34,197,94,0.15);  color: #4ade80; }
+
+.embudo-card-action {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+.embudo-btn {
+    flex: 1;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.embudo-btn:hover { opacity: 0.85; }
+
+.embudo-btn-pause   { background: rgba(234,179,8,0.2);  color: #ca8a04; }
+.embudo-btn-resume  { background: rgba(34,197,94,0.15); color: #4ade80; }
+.embudo-btn-view    { background: rgba(99,102,241,0.15); color: #818cf8; }
+
+@media (max-width: 768px) {
+    .embudo-board {
+        grid-template-columns: 1fr;
+    }
+}

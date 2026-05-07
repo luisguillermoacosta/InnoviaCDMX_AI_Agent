@@ -36,6 +36,7 @@
         <div class="tabs">
             <button class="tab-btn active" data-tab="analytics">📊 Analytics</button>
             <button class="tab-btn" data-tab="conversations">💬 Conversaciones</button>
+            <button class="tab-btn" data-tab="embudo">🎯 Embudo</button>
             <button class="tab-btn" data-tab="appointments">📅 Citas</button>
             <button class="tab-btn" data-tab="pending-tasks">🚨 Tareas Pendientes</button>
             <button class="tab-btn" data-tab="messages">❓ Help Center Info</button>
@@ -127,6 +128,49 @@
                     </div>
                     <div id="conversation-messages" class="conversation-messages">
                         <p class="loading-text">Selecciona una conversación para ver los mensajes</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Embudo -->
+        <div id="embudo" class="tab-content">
+            <div class="embudo-header">
+                <div>
+                    <h2>🎯 Embudo de Conversaciones</h2>
+                    <p class="section-description">Vista en tiempo real del estado de cada conversación activa.</p>
+                </div>
+                <button onclick="loadEmbudo()" class="btn-primary" style="padding:8px 16px;">🔄 Actualizar</button>
+            </div>
+            <div class="embudo-board" id="embudo-board">
+                <div class="embudo-column">
+                    <div class="embudo-column-header bot-header">
+                        <span class="embudo-column-icon">🤖</span>
+                        <span class="embudo-column-title">Con el Bot</span>
+                        <span class="embudo-column-count" id="embudo-count-bot">0</span>
+                    </div>
+                    <div class="embudo-cards" id="embudo-col-bot">
+                        <p class="loading-text">Cargando...</p>
+                    </div>
+                </div>
+                <div class="embudo-column">
+                    <div class="embudo-column-header escalada-header">
+                        <span class="embudo-column-icon">🙋</span>
+                        <span class="embudo-column-title">Escaladas a Humano</span>
+                        <span class="embudo-column-count" id="embudo-count-escalada">0</span>
+                    </div>
+                    <div class="embudo-cards" id="embudo-col-escalada">
+                        <p class="loading-text">Cargando...</p>
+                    </div>
+                </div>
+                <div class="embudo-column">
+                    <div class="embudo-column-header resuelta-header">
+                        <span class="embudo-column-icon">✅</span>
+                        <span class="embudo-column-title">Cita Agendada</span>
+                        <span class="embudo-column-count" id="embudo-count-resuelta">0</span>
+                    </div>
+                    <div class="embudo-cards" id="embudo-col-resuelta">
+                        <p class="loading-text">Cargando...</p>
                     </div>
                 </div>
             </div>
