@@ -3424,7 +3424,8 @@ app.get('/api/conversations', (req, res) => {
         botPaused: !!(session.bot_paused_until && new Date(session.bot_paused_until) > new Date()),
         pausedUntil: session.bot_paused_until || null,
         escalatedToHuman: hasFlag || (hasPending && !session.resolved_by_agent),
-        resolvedByAgent: !!session.resolved_by_agent
+        resolvedByAgent: !!session.resolved_by_agent,
+        recoverySentAt: session.recovery_sent_at || null
       };
     });
 
@@ -3916,19 +3917,24 @@ async function generateRecoveryMessage(session) {
   const firstName = name ? name.split(' ')[0] : null;
   const greeting = firstName ? `Hola ${firstName}` : 'Hola';
 
-  // Últimos 3 mensajes del usuario para dar contexto al LLM
-  const recentUserMsgs = (session.historial || [])
-    .filter(m => m.role === 'user')
-    .slice(-3)
-    .map(m => `- ${m.content}`)
+  // Últimos 6 turnos del historial para dar contexto real al LLM
+  const recentHistory = (session.historial || [])
+    .slice(-6)
+    .map(m => `${m.role === 'user' ? 'Clienta' : 'Bot'}: ${m.content}`)
     .join('\n');
 
-  const systemPrompt = `Eres la asistente virtual de ${bizConfig.businessName || 'una boutique de vestidos de novia'}.
-Tu objetivo es recuperar una conversación con una clienta que no ha respondido en las últimas horas.
-Redacta UN solo mensaje corto (máx 2 oraciones) cálido y femenino para retomar el contacto y motivarla a agendar una cita en el showroom.
-Reglas: no menciones que no respondió, no presiones, empieza con "${greeting} 🤍", solo devuelve el texto del mensaje sin comillas.`;
+  const systemPrompt = `Eres la asistente de ${bizConfig.businessName || 'una boutique de vestidos de novia'}.
+Una clienta no ha respondido desde hace varias horas. Tu tarea es enviarle UN solo mensaje de seguimiento.
 
-  const userPrompt = `Contexto — últimas cosas que dijo la clienta:\n${recentUserMsgs || '(primera vez que escribe, aún no ha respondido nada)'}`;
+Reglas:
+- Léete la conversación y haz UNA pregunta de seguimiento natural y específica basada en lo que ya se habló
+- Si el bot ya mandó el catálogo, no lo vuelvas a mencionar — pregunta algo más concreto (fecha de boda, si ya tiene idea del estilo, etc.)
+- Tono cálido, femenino, conversacional — como si fuera un WhatsApp real, no marketing
+- Máximo 1-2 oraciones
+- Empieza con "${greeting} 🤍"
+- Solo devuelve el texto del mensaje, sin comillas ni explicaciones`;
+
+  const userPrompt = `Conversación hasta ahora:\n${recentHistory || '(la clienta escribió pero no hay historial guardado)'}`;
 
   const response = await openaiClient.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -3936,8 +3942,8 @@ Reglas: no menciones que no respondió, no presiones, empieza con "${greeting} �
       { role: 'system', content: systemPrompt },
       { role: 'user',   content: userPrompt }
     ],
-    max_tokens: 150,
-    temperature: 0.8
+    max_tokens: 120,
+    temperature: 0.85
   });
 
   return response.choices?.[0]?.message?.content?.trim() || null;
@@ -3987,7 +3993,7 @@ async function runRecoveryJob() {
 
       await sendWhatsAppMessage(phone, message);
       sessions.updateSession(phone.replace(/\D/g, ''), { recovery_sent_at: new Date().toISOString() });
-      sessions.addToHistory(phone.replace(/\D/g, ''), 'assistant', `[Recovery] ${message}`);
+      sessions.addToHistory(phone.replace(/\D/g, ''), 'assistant', message);
       console.log(`✅ [Recovery Job] Mensaje enviado a ${phone}: "${message}"`);
     } catch (err) {
       console.error(`❌ [Recovery Job] Error enviando a ${phone}:`, err.message);
