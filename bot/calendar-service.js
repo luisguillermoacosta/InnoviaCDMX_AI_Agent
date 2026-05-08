@@ -754,7 +754,7 @@ async function getAvailableSlots(date, calendarClient, authClient, innoviaCDMXCa
  */
 async function isSlotAvailable(slotStart, calendarClient, authClient, calendarId, excludeEventId = null) {
   try {
-    const MAX_CITAS_POR_BLOQUE = 2;
+    const MAX_CITAS_POR_BLOQUE = 3;
     
     if (!authClient) {
       console.warn('⚠️  Google Auth no inicializado, asumiendo slot disponible');
