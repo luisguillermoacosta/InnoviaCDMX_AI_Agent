@@ -1472,43 +1472,27 @@ async function loadAppointments() {
             return;
         }
 
-        // ── Agrupar por día de agendamiento ───────────────────────────────────
-        const todayStr     = new Date().toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' });
-        const yesterdayStr = new Date(Date.now() - 864e5).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' });
+        // Filtrar últimos 3 meses
+        const cutoff3m = Date.now() - 90 * 24 * 60 * 60 * 1000;
+        const recent = data.appointments.filter(apt =>
+            apt.agendadaEn ? new Date(apt.agendadaEn).getTime() >= cutoff3m : true
+        );
 
-        const groups = {};
-        data.appointments.forEach(apt => {
-            const d = apt.agendadaEn
-                ? new Date(apt.agendadaEn).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' })
-                : 'Sin fecha';
-            if (!groups[d]) groups[d] = [];
-            groups[d].push(apt);
-        });
+        if (!recent.length) {
+            container.innerHTML = '<p class="loading-text">No hay citas en los últimos 3 meses</p>';
+            return;
+        }
 
-        const dayLabel = d => {
-            if (d === todayStr)     return 'Hoy';
-            if (d === yesterdayStr) return 'Ayer';
-            const parts = d.split('/'); // d/m/yyyy
-            if (parts.length === 3) {
-                const dt = new Date(+parts[2], +parts[1] - 1, +parts[0]);
-                return dt.toLocaleDateString('es-MX', {
-                    weekday: 'long', day: 'numeric', month: 'long',
-                    timeZone: 'America/Mexico_City'
-                });
-            }
-            return d;
-        };
-
-        const aptCard = apt => `
+        container.innerHTML = recent.map(apt => `
             <div class="appointment-card">
                 <div class="appointment-info">
                     <h3>${escapeHtml(apt.name || 'Sin nombre')}</h3>
                     <p>📞 ${formatPhone(apt.phone)}</p>
                     ${apt.fechaBoda ? `<p>💒 Boda: ${escapeHtml(apt.fechaBoda)}</p>` : ''}
                     <p style="font-size:11px;color:#adb5bd;margin-top:4px;">
-                        Agendada: ${apt.agendadaEn
-                            ? new Date(apt.agendadaEn).toLocaleTimeString('es-MX',
-                                { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })
+                        Agendada el ${apt.agendadaEn
+                            ? new Date(apt.agendadaEn).toLocaleDateString('es-MX',
+                                { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })
                             : '—'}
                     </p>
                 </div>
@@ -1517,34 +1501,7 @@ async function loadAppointments() {
                         ? `<div style="font-size:17px;font-weight:600;color:#667eea;margin-bottom:4px;">${formatAppointmentDate(apt.fechaCita)}</div>`
                         : '<div style="font-size:13px;color:#6c757d;">Fecha no especificada</div>'}
                 </div>
-            </div>`;
-
-        // Preservar qué grupos están abiertos antes de reconstruir
-        const openGroups = new Set(
-            [...container.querySelectorAll('details.conv-day-group[open]')].map(el => el.id)
-        );
-
-        // Renderizar grupos — mismo patrón <details> colapsable que conversaciones
-        container.innerHTML = Object.entries(groups).map(([day, apts], idx) => {
-            const label   = dayLabel(day);
-            const isToday = day === todayStr;
-            const groupId = `apt-group-${idx}`;
-            // Abrir si: es hoy, o estaba abierto antes del refresh
-            const open    = (isToday || openGroups.has(groupId)) ? 'open' : '';
-            const arrow   = open ? '▾' : '▸';
-            return `
-                <details class="conv-day-group" ${open} id="${groupId}">
-                    <summary onclick="toggleDayArrow('${groupId}')"
-                        style="list-style:none;display:flex;justify-content:space-between;align-items:center;
-                               padding:7px 10px;cursor:pointer;user-select:none;
-                               background:rgba(255,255,255,0.04);border-radius:8px;margin-bottom:2px;
-                               font-size:12px;font-weight:600;color:#94a3b8;letter-spacing:.3px;">
-                        <span><span class="day-arrow" style="margin-right:5px;">${arrow}</span>${label}</span>
-                        <span style="background:rgba(255,255,255,0.08);border-radius:10px;padding:1px 7px;font-size:11px;">${apts.length}</span>
-                    </summary>
-                    ${apts.map(aptCard).join('')}
-                </details>`;
-        }).join('');
+            </div>`).join('');
 
     } catch (error) {
         console.error('Error cargando citas:', error);
