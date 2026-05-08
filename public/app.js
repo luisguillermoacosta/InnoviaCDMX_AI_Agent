@@ -1519,13 +1519,19 @@ async function loadAppointments() {
                 </div>
             </div>`;
 
+        // Preservar qué grupos están abiertos antes de reconstruir
+        const openGroups = new Set(
+            [...container.querySelectorAll('details.conv-day-group[open]')].map(el => el.id)
+        );
+
         // Renderizar grupos — mismo patrón <details> colapsable que conversaciones
         container.innerHTML = Object.entries(groups).map(([day, apts], idx) => {
             const label   = dayLabel(day);
             const isToday = day === todayStr;
             const groupId = `apt-group-${idx}`;
-            const open    = isToday ? 'open' : '';
-            const arrow   = isToday ? '▾' : '▸';
+            // Abrir si: es hoy, o estaba abierto antes del refresh
+            const open    = (isToday || openGroups.has(groupId)) ? 'open' : '';
+            const arrow   = open ? '▾' : '▸';
             return `
                 <details class="conv-day-group" ${open} id="${groupId}">
                     <summary onclick="toggleDayArrow('${groupId}')"
