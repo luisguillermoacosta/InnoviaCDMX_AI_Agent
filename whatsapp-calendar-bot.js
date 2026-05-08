@@ -3958,7 +3958,15 @@ app.delete('/api/pending-tasks/:id', (req, res) => {
     if (isNaN(id) || id < 1) {
       return res.status(400).json({ error: 'id inválido' });
     }
+    // Obtener teléfono antes de resolver para actualizar sesión
+    const task = getPendingTasks().find(t => t.id === id);
     resolvePendingTask(id);
+    // Mover conversación a Resuelta en el Embudo
+    if (task?.phone) {
+      const cleanPhone = task.phone.replace(/\D/g, '');
+      sessions.updateSession(cleanPhone, { resolved_by_agent: true, escalated_to_human: false });
+      console.log(`🔄 Conversación ${cleanPhone} movida a Resuelta al resolver tarea #${id}`);
+    }
     res.json({ success: true });
   } catch (error) {
     console.error('Error resolviendo tarea pendiente:', error);
@@ -3970,9 +3978,17 @@ app.delete('/api/pending-tasks/:id', (req, res) => {
 // Body: { ids: [1, 2, 3] }  (si no se envían ids, resuelve todas)
 app.delete('/api/pending-tasks', express.json(), (req, res) => {
   try {
-    const tasks = getPendingTasks();
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Boolean) : tasks.map(t => t.id);
+    const allTasks = getPendingTasks();
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Boolean) : allTasks.map(t => t.id);
+    // Obtener teléfonos antes de resolver
+    const phones = allTasks.filter(t => ids.includes(t.id) && t.phone).map(t => t.phone);
     resolveMultipleTasks(ids);
+    // Mover conversaciones a Resuelta en el Embudo
+    phones.forEach(phone => {
+      const cleanPhone = phone.replace(/\D/g, '');
+      sessions.updateSession(cleanPhone, { resolved_by_agent: true, escalated_to_human: false });
+    });
+    if (phones.length) console.log(`🔄 ${phones.length} conversación(es) movidas a Resuelta al resolver tareas`);
     res.json({ success: true, resolved: ids.length });
   } catch (error) {
     console.error('Error resolviendo tareas pendientes en bulk:', error);
