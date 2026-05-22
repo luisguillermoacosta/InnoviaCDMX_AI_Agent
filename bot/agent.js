@@ -378,6 +378,17 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const { hora_inicio, nombre_cliente, telefono, fecha_boda } = toolArgs;
       console.log(`🔧 Agent tool: confirmar_cita(${nombre_cliente}, ${hora_inicio})`);
 
+      // SAFETY GUARD: nombre_cliente must be a real non-empty name.
+      // The LLM can pass "" or null even though the field is marked required.
+      const nombreFinal = (nombre_cliente || '').trim();
+      if (!nombreFinal) {
+        console.warn(`⚠️  confirmar_cita bloqueada: nombre_cliente vacío o faltante`);
+        return {
+          exito: false,
+          error: 'No puedes agendar la cita sin el nombre de la clienta. Pregúntale su nombre completo antes de continuar.'
+        };
+      }
+
       // SAFETY GUARD: If the session already has an appointment, delete it before creating
       // a new one. This handles cases where the agent mistakenly calls confirmar_cita
       // instead of reagendar_cita when the client already has a scheduled appointment.
@@ -425,7 +436,7 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       // ───────────────────────────────────────────────────────────────────
 
       const event = await createCalendarEventService(
-        nombre_cliente,
+        nombreFinal,
         telefono,
         null,
         hora_inicio,
