@@ -315,6 +315,24 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
 
       console.log(`🔧 Agent tool: buscar_cita_cliente(phone=${phone}, clientName=${clientName || 'none'})`);
 
+      // Guard: if the session already has a calendar_event_id, report it directly
+      // without requiring Google Calendar to confirm (handles network errors or
+      // cases where the event was created but the search can't find it).
+      if (session.calendar_event_id && !nombreOverride) {
+        const sessionsModule = require('../sessions');
+        const sessionData = sessionsModule.getSession(phone) || session;
+        const knownDate = sessionData.fecha_cita || session.fecha_cita || 'fecha registrada';
+        console.log(`📋 buscar_cita_cliente: cita ya conocida en sesión (event_id=${session.calendar_event_id})`);
+        return {
+          encontrada: true,
+          event_id: session.calendar_event_id,
+          resumen: clientName || 'Cita agendada',
+          fecha: knownDate,
+          hora: '',
+          mensaje: `La sesión indica que esta clienta ya tiene una cita agendada (ID: ${session.calendar_event_id}, fecha aproximada: ${knownDate}). Confírmale que su cita está registrada y ofrécele los detalles disponibles.`
+        };
+      }
+
       const event = await findEventByPhoneService(
         phone,
         clientName,

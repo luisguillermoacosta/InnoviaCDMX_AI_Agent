@@ -1601,54 +1601,59 @@ async function findEventByPhone(phone, clientName, calendarClient, authClient, c
     }
 
     const now = new Date();
-    // Look 7 days in the past (appointment may have been set for today/yesterday)
-    // and 6 months into the future
     const pastWindow = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const futureWindow = new Date(now.getTime() + 6 * 30 * 24 * 60 * 60 * 1000);
 
-    // Normalize phone: strip non-digits
-    // We use the last 4 digits for matching — avoids country-code and formatting
-    // mismatches (e.g. WhatsApp "525521920710" vs Calendar "55 219 20710")
+    // Use last 8 digits for matching — enough to be unique but tolerant of
+    // country-code differences (e.g. WhatsApp "525543571661" vs Calendar "55 4357 1661").
     const digitsOnly = phone.replace(/\D/g, '');
-    const last4  = digitsOnly.slice(-4);
-    const last10 = digitsOnly.slice(-10);
+    const last8 = digitsOnly.slice(-8);
 
-    // Attempt 1: fetch upcoming events and filter locally by last 4 phone digits.
-    // We do NOT use the `q` (text search) parameter because the phone is stored
-    // formatted with spaces ("55 219 20710") so a digit-only query ("5521920710")
-    // won't match inside Google's full-text index.
-    console.log(`🔍 findEventByPhone: buscando eventos y filtrando por últimos 4 dígitos "${last4}"`);
-    const res = await calendarClient.events.list({
-      auth,
-      calendarId,
-      timeMin: pastWindow.toISOString(),
-      timeMax: futureWindow.toISOString(),
-      maxResults: 50,          // wider net — we filter locally
-      singleEvents: true,
-      orderBy: 'startTime',
-      timeZone: 'America/Mexico_City'
-    });
-
-    const items = res.data.items || [];
-    // Strip all non-digits from each event description and check if it contains
-    // the last 4 digits of the incoming phone (country-code agnostic).
-    const match = items.find(ev => {
+    // Helper: check whether an event's description OR title contains the phone digits
+    const phoneMatchesEvent = (ev) => {
       const descDigits = (ev.description || '').replace(/\D/g, '');
-      return descDigits.includes(last4);
-    });
+      const titleDigits = (ev.summary || '').replace(/\D/g, '');
+      return descDigits.includes(last8) || titleDigits.includes(last8);
+    };
 
-    if (match) {
-      console.log(`✅ findEventByPhone: cita encontrada por últimos 4 dígitos del teléfono (ID: ${match.id})`);
-      return formatEventResult(match);
+    // Fetch events from one or more calendars and return the first phone match.
+    // We search CITAS NUEVAS first, then fall back to 'primary' in case staff
+    // created the event manually in the main Google calendar.
+    const calendarIds = calendarId === 'primary'
+      ? ['primary']
+      : [calendarId, 'primary'];
+
+    for (const calId of calendarIds) {
+      console.log(`🔍 findEventByPhone: buscando en calendario "${calId}" por últimos 8 dígitos "${last8}"`);
+      const res = await calendarClient.events.list({
+        auth,
+        calendarId: calId,
+        timeMin: pastWindow.toISOString(),
+        timeMax: futureWindow.toISOString(),
+        maxResults: 100,
+        singleEvents: true,
+        orderBy: 'startTime',
+        timeZone: 'America/Mexico_City'
+      });
+
+      const items = res.data.items || [];
+      const match = items.find(phoneMatchesEvent);
+      if (match) {
+        console.log(`✅ findEventByPhone: cita encontrada en "${calId}" por teléfono (ID: ${match.id})`);
+        return formatEventResult(match);
+      }
     }
 
-    // Attempt 2: fall back to name search if provided
+    // Fall back to name search if provided
     if (clientName) {
-      console.log(`🔍 findEventByPhone: sin resultados por teléfono (last4="${last4}"), intentando por nombre "${clientName}"`);
-      const byName = await findEventsByName(clientName, calendarClient, authClient, calendarId, 5);
-      if (byName && byName.length > 0) {
-        console.log(`✅ findEventByPhone: cita encontrada por nombre`);
-        return byName[0]; // Most recent upcoming
+      console.log(`🔍 findEventByPhone: sin resultados por teléfono (last8="${last8}"), intentando por nombre "${clientName}"`);
+      // Search all known calendars for the name too
+      for (const calId of calendarIds) {
+        const byName = await findEventsByName(clientName, calendarClient, authClient, calId, 5);
+        if (byName && byName.length > 0) {
+          console.log(`✅ findEventByPhone: cita encontrada en "${calId}" por nombre`);
+          return byName[0];
+        }
       }
     }
 
