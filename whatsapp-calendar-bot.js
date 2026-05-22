@@ -3448,10 +3448,10 @@ app.get('/api/analytics', async (req, res) => {
       // 1. MÉTRICAS DE USO
       usage: {
         totalConversations,
-        conversationsByDay: Object.entries(conversationsByDay).slice(-30).map(([date, count]) => ({ date, count })),
-        newConversationsByDay: Object.entries(newConversationsByDay).slice(-30).map(([date, count]) => ({ date, count })),
-        conversationsByWeek: Object.entries(conversationsByWeek).slice(-12).map(([week, count]) => ({ week, count })),
-        conversationsByMonth: Object.entries(conversationsByMonth).slice(-12).map(([month, count]) => ({ month, count })),
+        conversationsByDay: Object.entries(conversationsByDay).sort(([a], [b]) => a.localeCompare(b)).slice(-30).map(([date, count]) => ({ date, count })),
+        newConversationsByDay: Object.entries(newConversationsByDay).sort(([a], [b]) => a.localeCompare(b)).slice(-30).map(([date, count]) => ({ date, count })),
+        conversationsByWeek: Object.entries(conversationsByWeek).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([week, count]) => ({ week, count })),
+        conversationsByMonth: Object.entries(conversationsByMonth).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([month, count]) => ({ month, count })),
         newUsers: newUsers.size,
         returningUsers: returningUsers.size,
         avgMessagesPerConversation: parseFloat(avgMessagesPerConversation),
