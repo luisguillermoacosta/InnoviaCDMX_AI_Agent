@@ -2120,6 +2120,10 @@ app.post('/webhook', async (req, res) => {
       }
       // Manejar imágenes (recibos de pago, fotos, etc.) → escalar a humano
       else if (message.type === 'image') {
+        const senderCleanImg = senderPhone.replace(/\D/g, '');
+        if (STAFF_PHONES.some(suffix => senderCleanImg.endsWith(suffix))) {
+          console.log(`👥 [STAFF] Imagen de número del staff ignorada: ${senderCleanImg}`);
+        } else {
         const caption = message.image?.caption || '';
         const descripcion = caption
           ? `Imagen recibida: "${caption}"`
@@ -2137,6 +2141,7 @@ app.post('/webhook', async (req, res) => {
           clientName,
           historial: imgSession.historial || []
         });
+        } // end staff check for image
       }
       // Manejar otros tipos de media (documento, video, audio, sticker)
       else if (['document', 'video', 'audio', 'sticker', 'voice'].includes(message.type)) {
@@ -2154,27 +2159,31 @@ app.post('/webhook', async (req, res) => {
       }
       // Manejar respuestas de botones interactivos
       else if (message.type === 'interactive' && message.interactive) {
+        const senderCleanBtn = senderPhone.replace(/\D/g, '');
+        if (STAFF_PHONES.some(suffix => senderCleanBtn.endsWith(suffix))) {
+          console.log(`👥 [STAFF] Botón interactivo de número del staff ignorado: ${senderCleanBtn}`);
+        } else {
         const interactive = message.interactive;
-        
+
         if (interactive.type === 'button_reply') {
           const buttonId = interactive.button_reply?.id;
           const buttonTitle = interactive.button_reply?.title;
-          
+
           console.log(`🔘 Botón presionado por ${senderPhone}: ${buttonId} - "${buttonTitle}"`);
-          
+
           // CRITICAL: Verificar estado del bot ANTES de procesar botón
           const botMode = getBotMode();
           const isInactive = String(botMode).trim().toLowerCase() === 'inactive';
-          
+
           console.log(`🔍 [WEBHOOK CHECK] Verificación antes de processIncomingMessage (botón)`);
           console.log(`🔍 [WEBHOOK CHECK] Modo del bot: "${botMode}"`);
           console.log(`🔍 [WEBHOOK CHECK] ¿Es inactive?: ${isInactive}`);
-          
+
           if (isInactive) {
             console.log(`⏸️  [WEBHOOK CHECK] Bot INACTIVO - NO se procesará el botón`);
             return; // No procesar el botón
           }
-          
+
           // Procesar la respuesta del botón como si fuera un mensaje de texto
           // El botón puede tener un ID como "slot_0", "slot_1", etc.
           if (senderPhone && buttonId) {
@@ -2188,11 +2197,16 @@ app.post('/webhook', async (req, res) => {
             });
           }
         }
+        } // end staff check for interactive
       }
       // Manejar mensajes tipo "button" — llegan cuando el usuario hace clic en un
       // anuncio de Meta Ads con mensaje preescrito (CTWA / Click-To-WhatsApp).
       // El payload tiene: message.type === 'button', message.button.text (el texto del botón)
       else if (message.type === 'button') {
+        const senderCleanMetaBtn = senderPhone.replace(/\D/g, '');
+        if (STAFF_PHONES.some(suffix => senderCleanMetaBtn.endsWith(suffix))) {
+          console.log(`👥 [STAFF] Botón Meta Ads de número del staff ignorado: ${senderCleanMetaBtn}`);
+        } else {
         const buttonText = message.button?.text || '';
         console.log(`📣 [META ADS] Mensaje tipo 'button' recibido de ${senderPhone}: "${buttonText}"`);
 
@@ -2206,6 +2220,7 @@ app.post('/webhook', async (req, res) => {
             scheduleTextMessage(senderPhone, buttonText, {});
           }
         }
+        } // end staff check for button
       }
     }
 
