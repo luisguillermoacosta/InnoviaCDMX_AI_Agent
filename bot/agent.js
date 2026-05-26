@@ -412,9 +412,15 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       // ── Validación de cupo antes de confirmar ──────────────────────────
       // Verificar que: (a) hay eventos azules disponibles Y (b) no se superan 3 citas por slot
       const storedSlotsForCheck = session.slots_disponibles || [];
-      const appointmentTimeForCheck = new Date(hora_inicio).getTime();
+      // Compare local date+time strings (YYYY-MM-DDTHH:MM) instead of timestamps.
+      // The LLM often uses the wrong UTC offset (e.g. -06:00 in DST months when
+      // CDMX is actually -05:00), which causes a 1-hour timestamp difference that
+      // exceeds any safe millisecond tolerance. Comparing the local portion ignores
+      // the offset entirely, which is correct because both values represent CDMX time.
+      const localTime = (iso) => (iso || '').slice(0, 16); // "YYYY-MM-DDTHH:MM"
+      const appointmentLocal = localTime(hora_inicio);
       const matchingSlotForCheck = storedSlotsForCheck.find(
-        s => Math.abs(new Date(s.start).getTime() - appointmentTimeForCheck) < 60000
+        s => localTime(s.start) === appointmentLocal
       );
       const hasBlueEvent = !!matchingSlotForCheck?.eventId;
 
@@ -450,10 +456,7 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       if (event) {
         // Eliminar el evento azul (slot disponible) del calendario Innovia CDMX
         const storedSlots = session.slots_disponibles || [];
-        const appointmentTime = new Date(hora_inicio).getTime();
-        const matchingSlot = storedSlots.find(slot => {
-          return Math.abs(new Date(slot.start).getTime() - appointmentTime) < 60000;
-        });
+        const matchingSlot = storedSlots.find(slot => localTime(slot.start) === appointmentLocal);
         if (matchingSlot && matchingSlot.eventId) {
           console.log(`🗑️  Eliminando slot azul del calendario Innovia CDMX (ID: ${matchingSlot.eventId})`);
           await deleteCalendarEventService(matchingSlot.eventId, calendarClient, authClient, innoviaCDMXCalendarId);
@@ -684,10 +687,15 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
 
         // Propagate side-effects to sessionUpdates
         if (toolName === 'buscar_slots_disponibles' && result.slots_disponibles) {
-          sessionUpdates.slots_disponibles = result.slots_disponibles;
+          // Merge with existing slots instead of overwriting — the LLM may call this
+          // multiple times in the same turn (e.g. martes + miércoles). If we overwrite,
+          // only the last date's slots survive in session, so confirmar_cita can't find
+          // the eventId for any earlier date the user picks.
+          const existing = sessionUpdates.slots_disponibles || session.slots_disponibles || [];
+          const merged = [...existing, ...result.slots_disponibles];
+          sessionUpdates.slots_disponibles = merged;
           sessionUpdates.fecha_cita_solicitada = toolArgs.fecha;
-          // Also update session in-place so subsequent tool calls in the same turn can use it
-          session.slots_disponibles = result.slots_disponibles;
+          session.slots_disponibles = merged;
         }
         if (toolName === 'confirmar_cita' && result.exito) {
           sessionUpdates.calendar_event_id = result.event_id;
