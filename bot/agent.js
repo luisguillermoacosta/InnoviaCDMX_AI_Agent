@@ -92,10 +92,10 @@ const TOOLS = [
           },
           fecha_boda: {
             type: 'string',
-            description: 'Fecha de boda de la clienta en formato YYYY-MM-DD. OBLIGATORIO: debes preguntar y obtener este dato antes de llamar a esta función.'
+            description: 'Fecha de boda de la clienta en formato YYYY-MM-DD. Intenta obtenerla antes de confirmar, pero si la clienta dice que no la tiene aún, omite este campo o pasa null — no bloquees la cita por esto.'
           }
         },
-        required: ['hora_inicio', 'nombre_cliente', 'telefono', 'fecha_boda']
+        required: ['hora_inicio', 'nombre_cliente', 'telefono']
       }
     }
   },
@@ -237,8 +237,8 @@ Hoy es ${today}.
    - Llama a \`buscar_slots_disponibles\` para ver disponibilidad.
    - **Si no hay horarios disponibles en la fecha solicitada:** NO preguntes si quiere buscar en otra fecha — búscala tú directamente. Llama de inmediato a \`buscar_slots_disponibles\` para las siguientes fechas con lógica según lo que pidió la clienta: si pidió un fin de semana, prueba el siguiente sábado y el siguiente domingo en el mismo turno. Si pidió entre semana, prueba los siguientes 2-3 días hábiles. Presenta las alternativas encontradas directamente, por ejemplo: "No tenemos disponibilidad ese día, pero sí tenemos estos horarios para [fecha alternativa]: [lista de slots]". Si tras buscar 2-3 fechas alternativas tampoco hay nada, entonces sí informa que no hay disponibilidad próxima y ofrece intentar una fecha más lejana.
    - Muestra los horarios disponibles de forma clara y amigable.
-   - **ANTES de llamar a \`confirmar_cita\`, DEBES tener la fecha de boda de la clienta.** Si aún no la tienes, pregúntala obligatoriamente en ese momento: "¿Y para cuándo es tu boda? 💍" (o variación natural). No puedes confirmar la cita sin este dato.
-   - **Cuando la clienta ya eligió un horario Y tienes su fecha de boda, llama a \`confirmar_cita\` de inmediato** — sin pedir una confirmación adicional. El hecho de que la clienta seleccione un horario ya es su confirmación implícita. Después de agendar, envía un mensaje confirmando los detalles (fecha, hora, dirección).
+   - **Antes de llamar a \`confirmar_cita\`, intenta obtener la fecha de boda.** Pregúntala una vez: "¿Y para cuándo es tu boda? 💍". Si la clienta responde que aún no la tiene o la desconoce, acepta eso y confirma la cita de todas formas pasando `fecha_boda: null`. **Nunca bloquees ni postergues la confirmación por falta de fecha de boda.**
+   - **Cuando la clienta ya eligió un horario y ya preguntaste (o intentaste preguntar) la fecha de boda, llama a \`confirmar_cita\` de inmediato** — sin pedir confirmación adicional. El hecho de que la clienta seleccione un horario ya es su confirmación implícita. Después de agendar, envía un mensaje confirmando los detalles (fecha, hora, dirección).
 7. **Para consultar cita existente:** Si la clienta pregunta por su cita ("¿tengo una cita?", "¿cuándo es mi cita?", "¿me puedes dar mis datos de cita?") y la "Cita agendada (ID en calendario)" es "Ninguna", sigue este flujo de búsqueda en orden:
    a. Llama a \`buscar_cita_cliente\` (sin parámetros) — busca en Google Calendar por número de teléfono.
    b. Si regresa \`encontrada: true\` → confirma los detalles a la clienta. El ID quedará registrado para reagendar o cancelar.
