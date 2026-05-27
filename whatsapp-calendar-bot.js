@@ -2778,7 +2778,10 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
 
         const esPrimeraVez = [
           'primera vez', 'primera visita', 'nueva', 'nunca he ido',
-          'nunca he visitado', 'por primera', 'no he ido', 'primer'
+          'nunca he visitado', 'por primera', 'no he ido', 'primer',
+          'soy novia', 'me caso', 'me voy a casar', 'voy a casarme',
+          'busco vestido', 'ver vestidos', 'ver sus vestidos', 'ver los vestidos',
+          'comprar vestido', 'elegir vestido', 'vestido de novia',
         ].some(k => msgLower.includes(k));
 
         if (esAjuste) {
@@ -2818,12 +2821,34 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       const quiereAgendar = agendarKeywords.some(k => msgLower.includes(k));
 
       if (quiereAgendar && !session.tipo_cita && !hasAppointment && !options.isButtonClick) {
-        const reply = '¡Con gusto agendamos tu cita! 💕\n\n¿Es tu primera visita con nosotros o ya tienes tu vestido y buscas agendar una cita de ajustes?';
-        sessions.updateSession(cleanPhone, { pending_tipo_cita: true });
-        sessions.addToHistory(cleanPhone, 'user', incomingMessage);
-        sessions.addToHistory(cleanPhone, 'assistant', reply);
-        await sendWhatsAppMessage(cleanPhone, reply);
-        return;
+        // Señales que indican EVIDENTEMENTE que es primera visita — no hace falta preguntar
+        const esEvidementePrimeraVez = [
+          // Promociones / eventos
+          'promo', 'promocion', 'promoción', 'hot sale', 'hotsale', 'oferta', 'descuento',
+          // Ver o buscar vestido
+          'ver vestidos', 'ver los vestidos', 'ver sus vestidos', 'busco vestido',
+          'buscar vestido', 'comprar vestido', 'elegir vestido', 'vestido de novia',
+          // Identidad de novia
+          'soy novia', 'me caso', 'me voy a casar', 'voy a casarme', 'quiero casarme',
+          // Explícito primera vez
+          'primera vez', 'primera visita', 'por primera', 'nunca he ido', 'no he ido',
+          'nunca he visitado',
+        ].some(k => msgLower.includes(k));
+
+        if (esEvidementePrimeraVez) {
+          // Es claramente primera visita — marcar y dejar que el agente continúe
+          console.log(`✅ [TIPO CITA] Primera vez evidente detectada para ${cleanPhone}, omitiendo pregunta.`);
+          sessions.updateSession(cleanPhone, { pending_tipo_cita: false, tipo_cita: 'primera_vez' });
+          // No hacer return — continuar al agente normalmente
+        } else {
+          // Ambiguo — preguntar
+          const reply = '¡Con gusto agendamos tu cita! 💕\n\n¿Es tu primera visita con nosotros o ya tienes tu vestido y buscas agendar una cita de ajustes?';
+          sessions.updateSession(cleanPhone, { pending_tipo_cita: true });
+          sessions.addToHistory(cleanPhone, 'user', incomingMessage);
+          sessions.addToHistory(cleanPhone, 'assistant', reply);
+          await sendWhatsAppMessage(cleanPhone, reply);
+          return;
+        }
       }
     }
     // ── FIN TIPO DE CITA ──────────────────────────────────────────────────────
