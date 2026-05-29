@@ -3271,6 +3271,7 @@ app.get('/api/analytics', async (req, res) => {
       // usando timezone de CDMX para que las horas sean locales (no UTC).
       session.historial?.forEach(msg => {
         const msgDate = new Date(msg.timestamp);
+        if (msg.role !== 'user') return; // solo mensajes inbound
         if (msgDate < periodStart || msgDate > now) return; // filtrar por periodo
 
         // Obtener fecha y hora en CDMX para evitar el offset UTC del servidor

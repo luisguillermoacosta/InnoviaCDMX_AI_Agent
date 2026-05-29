@@ -539,9 +539,13 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         }
 
         // CRITICAL: Delete the blue event at the NEW slot (it's now occupied)
+        // Use local time comparison (YYYY-MM-DDTHH:MM) to avoid DST offset mismatches.
+        // Timestamp comparison breaks when stored slots use CST (-06:00) but the
+        // appointment is in CDT (-05:00) — a 1-hour diff that exceeds any ms tolerance.
+        const localTime = (iso) => (iso || '').slice(0, 16);
         const storedSlots = session.slots_disponibles || [];
-        const appointmentTime = new Date(nueva_hora_inicio).getTime();
-        let matchingSlot = storedSlots.find(slot => Math.abs(new Date(slot.start).getTime() - appointmentTime) < 60000);
+        const newAppointmentLocal = localTime(nueva_hora_inicio);
+        let matchingSlot = storedSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
 
         // Fallback: if not found in session (session may be stale), fetch fresh slots for that date
         if ((!matchingSlot || !matchingSlot.eventId) && innoviaCDMXCalendarId) {
@@ -549,7 +553,7 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
           try {
             const newDate = nueva_hora_inicio.split('T')[0]; // YYYY-MM-DD
             const freshSlots = await getAvailableSlots(newDate, calendarClient, authClient, innoviaCDMXCalendarId, null);
-            matchingSlot = freshSlots.find(slot => Math.abs(new Date(slot.start).getTime() - appointmentTime) < 60000);
+            matchingSlot = freshSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
             if (matchingSlot) {
               console.log(`✅ Slot encontrado en búsqueda fresca (ID: ${matchingSlot.eventId})`);
             }
