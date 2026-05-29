@@ -886,15 +886,17 @@ function generateAIInsights(data) {
         const count = data.usage.peakHour.count || 0;
         // Formatear como hora amigable: "14" → "2:00 pm", "09" → "9:00 am"
         const hourNum = parseInt(hour, 10);
-        const hourLabel = isNaN(hourNum) ? `${hour}:00` :
-            hourNum === 0  ? '12:00 am' :
-            hourNum < 12   ? `${hourNum}:00 am` :
-            hourNum === 12 ? '12:00 pm' :
-                             `${hourNum - 12}:00 pm`;
+        const formatHour = (h) =>
+            h === 0  ? '12:00 am' :
+            h < 12   ? `${h}:00 am` :
+            h === 12 ? '12:00 pm' :
+                       `${h - 12}:00 pm`;
+        const hourLabel = isNaN(hourNum) ? `${hour}:00` : formatHour(hourNum);
+        const nextHourLabel = isNaN(hourNum) ? `${hour + 1}:00` : formatHour((hourNum + 1) % 24);
         insights.push({
             icon: '🕐',
             title: 'Horario con Mayor Tráfico',
-            text: `El pico de actividad ocurre a las ${hourLabel} con ${count} mensajes. Asegúrate de tener cobertura en ese horario.`
+            text: `El pico de actividad ocurre de ${hourLabel} a ${nextHourLabel} con ${count} mensajes. Asegúrate de tener cobertura en ese horario.`
         });
     }
 
