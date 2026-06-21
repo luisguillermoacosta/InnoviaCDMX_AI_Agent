@@ -18,7 +18,6 @@ const {
 } = require('../config');
 const {
   getAvailableSlots,
-  isSlotAvailable,
   createCalendarEvent: createCalendarEventService,
   deleteCalendarEvent: deleteCalendarEventService,
   updateCalendarEvent: updateCalendarEventService,
@@ -410,7 +409,10 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       }
 
       // ── Validación de cupo antes de confirmar ──────────────────────────
-      // Verificar que: (a) hay eventos azules disponibles Y (b) no se superan 3 citas por slot
+      // Modelo único de disponibilidad: un horario está libre si y solo si
+      // todavía existe su evento azul (sin nombre) en el calendario "Innovia CDMX".
+      // Ese es el mismo criterio que usa getAvailableSlots al OFRECER horarios,
+      // así que ofrecer y confirmar nunca se contradicen.
       const storedSlotsForCheck = session.slots_disponibles || [];
       // Compare local date+time strings (YYYY-MM-DDTHH:MM) instead of timestamps.
       // The LLM often uses the wrong UTC offset (e.g. -06:00 in DST months when
@@ -424,20 +426,11 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       );
       const hasBlueEvent = !!matchingSlotForCheck?.eventId;
 
-      const slotCheck = await isSlotAvailable(hora_inicio, calendarClient, authClient, calendarId);
-
       if (!hasBlueEvent) {
         console.warn(`⚠️  confirmar_cita bloqueada: no hay evento azul disponible para ${hora_inicio}`);
         return {
           exito: false,
           error: 'Este horario ya no tiene cupos disponibles. Por favor elige otro horario.'
-        };
-      }
-      if (!slotCheck.available) {
-        console.warn(`⚠️  confirmar_cita bloqueada: cupo lleno ${slotCheck.currentCount}/${slotCheck.maxCount} para ${hora_inicio}`);
-        return {
-          exito: false,
-          error: `Este horario ya tiene ${slotCheck.currentCount} citas agendadas (máximo ${slotCheck.maxCount}). Por favor elige otro horario.`
         };
       }
       // ───────────────────────────────────────────────────────────────────

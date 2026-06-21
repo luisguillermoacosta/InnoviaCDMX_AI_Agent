@@ -743,107 +743,6 @@ async function getAvailableSlots(date, calendarClient, authClient, innoviaCDMXCa
 }
 
 /**
- * Verifica si un slot específico aún está disponible antes de crear la cita
- * Esto previene que se agenden más de MAX_CITAS_POR_BLOQUE citas en el mismo bloque
- * @param {string} slotStart - Start time of the slot in ISO format (e.g., "2026-03-18T11:00:00.000Z")
- * @param {Object} calendarClient - Google Calendar API client
- * @param {Object} authClient - Google Auth client
- * @param {string} calendarId - Calendar ID to check
- * @param {string} excludeEventId - Event ID to exclude from count (optional, for rescheduling)
- * @returns {Promise<{available: boolean, currentCount: number, maxCount: number}>}
- */
-async function isSlotAvailable(slotStart, calendarClient, authClient, calendarId, excludeEventId = null) {
-  try {
-    const MAX_CITAS_POR_BLOQUE = 3;
-    
-    if (!authClient) {
-      console.warn('⚠️  Google Auth no inicializado, asumiendo slot disponible');
-      return { available: true, currentCount: 0, maxCount: MAX_CITAS_POR_BLOQUE };
-    }
-
-    // Obtener cliente de autenticación
-    let auth;
-    if (authClient && typeof authClient.getClient === 'function') {
-      auth = await authClient.getClient();
-    } else {
-      auth = authClient;
-    }
-
-    // Parsear la fecha/hora del slot
-    const slotDate = new Date(slotStart);
-    const year = slotDate.getFullYear();
-    const month = slotDate.getMonth() + 1;
-    const day = slotDate.getDate();
-    const hour = slotDate.getHours();
-    const minute = slotDate.getMinutes();
-
-    // Calcular el bloque de 90 minutos
-    const blockStart = new Date(year, month - 1, day, hour, minute, 0);
-    const blockEnd = new Date(blockStart.getTime() + 90 * 60 * 1000); // 90 minutos después
-
-    // Obtener eventos del día
-    const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
-
-    const events = await calendarClient.events.list({
-      auth: auth,
-      calendarId: calendarId,
-      timeMin: startOfDay.toISOString(),
-      timeMax: endOfDay.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-      timeZone: 'America/Mexico_City'
-    });
-
-    const eventItems = events.data.items || [];
-
-    // Contar citas en este bloque específico
-    let citasEnBloque = 0;
-    
-    eventItems.forEach(e => {
-      // Excluir el evento que se está moviendo (si es rescheduling)
-      if (excludeEventId && e.id === excludeEventId) {
-        return;
-      }
-
-      let bookedStart, bookedEnd;
-      
-      if (e.start.dateTime) {
-        bookedStart = new Date(e.start.dateTime);
-        bookedEnd = new Date(e.end.dateTime);
-      } else if (e.start.date) {
-        bookedStart = new Date(e.start.date + 'T00:00:00');
-        bookedEnd = new Date(e.end.date + 'T23:59:59');
-      } else {
-        return;
-      }
-
-      // Verificar si se solapa con el bloque
-      const overlaps = bookedStart < blockEnd && bookedEnd > blockStart;
-      
-      if (overlaps) {
-        citasEnBloque++;
-        console.log(`   📌 Verificación de disponibilidad: Cita encontrada en bloque (${hour}:${String(minute).padStart(2, '0')}): ${e.summary || 'Sin título'}`);
-      }
-    });
-
-    const available = citasEnBloque < MAX_CITAS_POR_BLOQUE;
-    
-    console.log(`   🔍 Verificación de slot ${hour}:${String(minute).padStart(2, '0')}: ${citasEnBloque}/${MAX_CITAS_POR_BLOQUE} citas - ${available ? '✅ DISPONIBLE' : '❌ LLENO'}`);
-
-    return {
-      available,
-      currentCount: citasEnBloque,
-      maxCount: MAX_CITAS_POR_BLOQUE
-    };
-  } catch (error) {
-    console.error('❌ Error verificando disponibilidad del slot:', error.message);
-    // En caso de error, asumir disponible para no bloquear el proceso
-    return { available: true, currentCount: 0, maxCount: 2 };
-  }
-}
-
-/**
  * Create calendar event in Google Calendar
  * @param {string} name - Client's full name
  * @param {string} phone - Client's phone number
@@ -1677,7 +1576,6 @@ module.exports = {
   getAvailableSlots,
   isDayOpen,
   getDefaultSlots,
-  isSlotAvailable,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
