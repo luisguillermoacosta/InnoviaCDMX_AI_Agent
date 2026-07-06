@@ -3373,7 +3373,7 @@ app.get('/api/conversations', (req, res) => {
 
       // Backfill 1: tarea pendiente activa sin flag
       if (hasPending && !hasFlag && !session.resolved_by_agent) {
-        sessions.updateSession(cleanPhone, { escalated_to_human: true, resolved_by_agent: false });
+        sessions.updateSession(cleanPhone, { escalated_to_human: true, resolved_by_agent: false }, { touch: false });
       }
 
       // Backfill 2: historial contiene mensaje del bot con frases de escalación
@@ -3389,7 +3389,7 @@ app.get('/api/conversations', (req, res) => {
           ESCALATION_PHRASES.some(p => (m.content || '').toLowerCase().includes(p))
         );
       if (hasEscalationInHistory) {
-        sessions.updateSession(cleanPhone, { escalated_to_human: true, resolved_by_agent: false });
+        sessions.updateSession(cleanPhone, { escalated_to_human: true, resolved_by_agent: false }, { touch: false });
       }
 
       return {

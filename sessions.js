@@ -86,8 +86,10 @@ function peekSession(phone) {
   return sessions.get(cleanPhone) || null;
 }
 
-function updateSession(phone, data) {
+function updateSession(phone, data, options = {}) {
   const cleanPhone = phone.replace(/\D/g, '');
+  // Guardar la actividad previa ANTES de getSession, que la re-sella al leer
+  const previousActivity = sessions.get(cleanPhone)?.ultima_actividad;
   const session = getSession(cleanPhone);
 
   if (data.etapa && !['primer_contacto', 'interesada', 'cita_agendada'].includes(data.etapa)) {
@@ -96,9 +98,13 @@ function updateSession(phone, data) {
   }
 
   Object.assign(session, data);
-  session.ultima_actividad = new Date().toISOString();
+  // touch: false → cambio administrativo (backfill de flags): no debe mover
+  // la conversación al día de hoy en el dashboard
+  session.ultima_actividad = (options.touch === false && previousActivity)
+    ? previousActivity
+    : new Date().toISOString();
 
-  const importantChanges = ['etapa', 'nombre_novia', 'fecha_boda', 'fecha_cita', 'calendar_event_id'];
+  const importantChanges = ['etapa', 'nombre_novia', 'fecha_boda', 'fecha_cita', 'calendar_event_id', 'escalated_to_human', 'resolved_by_agent'];
   const hasImportantChange = importantChanges.some(key => Object.prototype.hasOwnProperty.call(data, key));
 
   if (hasImportantChange) {
