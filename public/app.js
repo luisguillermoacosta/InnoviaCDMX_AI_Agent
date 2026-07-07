@@ -1766,7 +1766,7 @@ function updateBotModeUI(mode) {
             badgeColor: '#ff4444'
         },
         'test': {
-            text: 'Modo de pruebas - Solo responderá a +525521920710',
+            text: 'Modo de pruebas - Solo responderá a +19179605545',
             color: '#ffb800',
             shadow: 'rgba(255, 184, 0, 0.5)',
             badge: 'PRUEBAS',

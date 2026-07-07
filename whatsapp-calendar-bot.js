@@ -1082,14 +1082,14 @@ async function sendTypingIndicator(phoneNumber, action = 'typing_on') {
     console.log(`⏸️  [TYPING CHECK] Bot INACTIVO - Typing indicator BLOQUEADO`);
     return; // No enviar typing indicator si el bot está inactivo
   } else if (botMode === 'test') {
-    const TEST_PHONE_FULL = '525521920710';
-    const TEST_PHONE_SHORT = '5521920710';
+    const TEST_PHONE_FULL = '19179605545';
+    const TEST_PHONE_SHORT = '9179605545';
     const exactMatchFull = cleanPhone === TEST_PHONE_FULL;
     const exactMatchShort = cleanPhone === TEST_PHONE_SHORT;
     const endsWithMatch = cleanPhone.length >= 10 && cleanPhone.length <= 12 && cleanPhone.endsWith(TEST_PHONE_SHORT);
     
     // Comparación por últimos dígitos (para manejar códigos de país diferentes)
-    // El número puede venir como 5215521920710 (52 + 1 + 5521920710)
+    // El número puede venir como 19179605545 (1 + 9179605545)
     // Necesitamos comparar los últimos 10 dígitos
     const last10Digits = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
     const last10Match = last10Digits === TEST_PHONE_SHORT;
@@ -1186,14 +1186,14 @@ async function sendWhatsAppMessage(phoneNumber, message, options = {}) {
     console.log(`⏸️  ============================================\n`);
     return { success: false, blocked: true, reason: 'bot_inactive' };
   } else if (botMode === 'test') {
-    const TEST_PHONE_FULL = '525521920710';
-    const TEST_PHONE_SHORT = '5521920710';
+    const TEST_PHONE_FULL = '19179605545';
+    const TEST_PHONE_SHORT = '9179605545';
     const exactMatchFull = cleanPhone === TEST_PHONE_FULL;
     const exactMatchShort = cleanPhone === TEST_PHONE_SHORT;
     const endsWithMatch = cleanPhone.length >= 10 && cleanPhone.length <= 12 && cleanPhone.endsWith(TEST_PHONE_SHORT);
     
     // Comparación por últimos dígitos (para manejar códigos de país diferentes)
-    // El número puede venir como 5215521920710 (52 + 1 + 5521920710)
+    // El número puede venir como 19179605545 (1 + 9179605545)
     // Necesitamos comparar los últimos 10 dígitos
     const last10Digits = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
     const last10Match = last10Digits === TEST_PHONE_SHORT;
@@ -1687,8 +1687,8 @@ app.post('/webhook', async (req, res) => {
 
       if (senderPhone) {
         const cleanPhone = senderPhone.replace(/\D/g, '');
-        const TEST_PHONE_FULL = '525521920710';
-        const TEST_PHONE_SHORT = '5521920710';
+        const TEST_PHONE_FULL = '19179605545';
+        const TEST_PHONE_SHORT = '9179605545';
         
         // Comparaciones exactas
         const exactMatchFull = cleanPhone === TEST_PHONE_FULL;
@@ -1698,7 +1698,7 @@ app.post('/webhook', async (req, res) => {
         const endsWithMatch = cleanPhone.length >= 10 && cleanPhone.endsWith(TEST_PHONE_SHORT);
         
         // Comparación por últimos dígitos (para manejar códigos de país diferentes)
-        // El número puede venir como 5215521920710 (52 + 1 + 5521920710)
+        // El número puede venir como 19179605545 (1 + 9179605545)
         // Necesitamos comparar los últimos 10 dígitos
         const last10Digits = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
         const last10Match = last10Digits === TEST_PHONE_SHORT;
@@ -2045,7 +2045,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 // Sistema unificado de estado del bot
-// Modos: 'inactive' (inactivo), 'test' (solo +525521920710), 'active' (todos)
+// Modos: 'inactive' (inactivo), 'test' (solo +19179605545), 'active' (todos)
 function getBotMode() {
   try {
     // CRITICAL: Usar path absoluto para Railway
@@ -2163,7 +2163,7 @@ function setBotMode(mode) {
       if (verifyStatus.mode === mode) {
         const modeNames = {
           'inactive': 'INACTIVO',
-          'test': 'MODO DE PRUEBAS (solo +525521920710)',
+          'test': 'MODO DE PRUEBAS (solo +19179605545)',
           'active': 'ACTIVO (todos los números)'
         };
         console.log(`✅ Estado del bot actualizado correctamente: ${modeNames[mode]}`);
@@ -2245,7 +2245,7 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
   console.log(`🚨 ============================================\n`);
   
   // CRITICAL: Verificar estado del bot PRIMERO, antes de cualquier otra cosa
-  // Modos: 'inactive' (bloquear todo), 'test' (solo +525521920710), 'active' (todos)
+  // Modos: 'inactive' (bloquear todo), 'test' (solo +19179605545), 'active' (todos)
   console.log(`\n🔍 ============================================`);
   console.log(`🔍 VERIFICACIÓN DE MODO DEL BOT`);
   console.log(`🔍 ============================================`);
@@ -2256,8 +2256,8 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
   console.log(`🔍 [BOT MODE CHECK] ¿Es 'active'?: ${botMode === 'active'}`);
   
   // cleanPhone ya está declarado arriba, solo declarar las constantes de prueba
-  const TEST_PHONE_FULL = '525521920710'; // Con código de país
-  const TEST_PHONE_SHORT = '5521920710'; // Sin código de país
+  const TEST_PHONE_FULL = '19179605545'; // Con código de país
+  const TEST_PHONE_SHORT = '9179605545'; // Sin código de país
   
   console.log(`🔍 [BOT MODE CHECK] Número recibido: ${senderPhone}`);
   console.log(`🔍 [BOT MODE CHECK] Número limpio: ${cleanPhone}`);
@@ -2309,7 +2309,7 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
     const endsWithMatch = cleanPhone.length >= 10 && cleanPhone.length <= 12 && cleanPhone.endsWith(TEST_PHONE_SHORT);
     
     // Comparación por últimos dígitos (para manejar códigos de país diferentes)
-    // El número puede venir como 5215521920710 (52 + 1 + 5521920710)
+    // El número puede venir como 19179605545 (1 + 9179605545)
     // Necesitamos comparar los últimos 10 dígitos
     const last10Digits = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
     const last10Match = last10Digits === TEST_PHONE_SHORT;
@@ -2327,7 +2327,7 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       console.log(`🧪 🚫 BLOQUEO TOTAL - MODO DE PRUEBAS ACTIVO`);
       console.log(`🧪 ============================================`);
       console.log(`🧪 Número recibido: ${senderPhone} (limpio: ${cleanPhone})`);
-      console.log(`🧪 Número permitido: +525521920710 (${TEST_PHONE_FULL} o ${TEST_PHONE_SHORT})`);
+      console.log(`🧪 Número permitido: +19179605545 (${TEST_PHONE_FULL} o ${TEST_PHONE_SHORT})`);
       console.log(`🧪 ⚠️  NO se procesará`);
       console.log(`🧪 ⚠️  NO se enviará respuesta`);
       console.log(`🧪 ⚠️  NO se guardará en historial`);
@@ -3653,7 +3653,7 @@ app.put('/api/bot-mode', (req, res) => {
     if (success) {
       const messages = {
         'inactive': 'Bot desactivado - No responderá a ningún mensaje',
-        'test': 'Modo de pruebas activado - Solo responderá a +525521920710',
+        'test': 'Modo de pruebas activado - Solo responderá a +19179605545',
         'active': 'Bot activado - Responderá a todos los números'
       };
       res.json({ success: true, mode, message: messages[mode] });
@@ -3670,17 +3670,15 @@ app.put('/api/bot-mode', (req, res) => {
 app.get('/api/test-mode-diagnostic', (req, res) => {
   try {
     const mode = getBotMode();
-    const TEST_PHONE_FULL = '525521920710';
-    const TEST_PHONE_SHORT = '5521920710';
+    const TEST_PHONE_FULL = '19179605545';
+    const TEST_PHONE_SHORT = '9179605545';
     
     // Probar diferentes formatos del número de prueba
     const testNumbers = [
-      '+525521920710',
-      '525521920710',
-      '5521920710',
-      '5255219207100',
-      '15521920710',
-      '+15521920710'
+      '+19179605545',
+      '19179605545',
+      '9179605545',
+      '191796055450'
     ];
     
     const results = testNumbers.map(testNum => {
@@ -3709,7 +3707,7 @@ app.get('/api/test-mode-diagnostic', (req, res) => {
       testPhoneShort: TEST_PHONE_SHORT,
       testResults: results,
       message: mode === 'test' 
-        ? 'Modo test activo - Solo +525521920710 puede enviar mensajes'
+        ? 'Modo test activo - Solo +19179605545 puede enviar mensajes'
         : `Modo actual: ${mode} - Verifica los resultados arriba`
     });
   } catch (error) {
@@ -3766,7 +3764,7 @@ app.put('/api/test-mode-status', (req, res) => {
     const success = setBotMode(active ? 'test' : 'active');
     if (success) {
       const message = active 
-        ? 'Modo de pruebas activado - El bot solo responderá a +525521920710'
+        ? 'Modo de pruebas activado - El bot solo responderá a +19179605545'
         : 'Modo de pruebas desactivado - El bot responderá a todos';
       res.json({ success: true, active, message });
     } else {
