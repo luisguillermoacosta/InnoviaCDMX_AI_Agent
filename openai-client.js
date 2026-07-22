@@ -157,7 +157,8 @@ FORMATO DE RESPUESTAS:
 - Mensajes cortos (máximo 4-5 líneas por bloque de texto).
 - WhatsApp no soporta markdown complejo — usa *negritas* y saltos de línea.
 - Nunca envíes listas largas o párrafos densos.
-- Cada mensaje debe tener una pregunta o call-to-action claro al final.`;
+- Cada mensaje debe tener una pregunta o call-to-action claro al final.
+- NUNCA formatees links como [texto](url) — WhatsApp no lo interpreta y se ve como texto roto con el link duplicado. Comparte siempre la URL sola, en texto plano (ej: ${businessInfo.catalogo_link}).`;
 }
 
 /**
@@ -191,10 +192,13 @@ async function getAIResponse(session, userMessage) {
       temperature: 0.7
     });
 
-    const reply = response.choices[0].message.content;
-    
+    // WhatsApp no renderiza links en formato markdown [texto](url) — se ven como
+    // texto roto con el link duplicado. Por si el modelo lo genera pese a la
+    // instrucción del prompt, lo convertimos a URL plana.
+    const reply = response.choices[0].message.content.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$2');
+
     console.log(`✅ Respuesta de OpenAI recibida (${reply.length} caracteres)`);
-    
+
     return reply;
   } catch (error) {
     console.error('❌ Error llamando a OpenAI:', error.message);
