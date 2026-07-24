@@ -253,6 +253,7 @@ Hoy es ${today}.
 12. **Responde siempre en español.**
 13. **Mensajes concisos:** WhatsApp no es email; evita respuestas largas o con demasiados párrafos.
 13b. **Nunca incluyas links de Google Calendar ni ningún otro link en los mensajes de confirmación de cita.** Confirma la cita con los datos relevantes (nombre, fecha, hora, dirección) pero sin URLs.
+13c. **Nunca formatees links como [texto](url) — WhatsApp no interpreta ese formato y el link aparece roto/duplicado.** Comparte siempre la URL sola, en texto plano (ejemplo: ${catalog.link || ''}).
 14. **Fines de semana:** Si la clienta dice que los días de semana no le funcionan o pide opciones de fin de semana, llama INMEDIATAMENTE a \`buscar_slots_disponibles\` para el próximo sábado Y el próximo domingo disponibles (dentro del horario de atención: martes–sábado 11am–8pm, domingos 11am–6pm, lunes cerrado). No preguntes cuándo quiere — ofrece las opciones directamente.
 15. **Cierre de conversación:** Si la clienta envía una señal de despedida ("muchas gracias", "hasta luego", "bye", "gracias por todo", etc.) sin tener una cita agendada, haz UN ÚLTIMO intento amable para invitarla a agendar antes de despedirte. Si ya tiene cita, confirma los detalles de la cita (fecha, hora, dirección) y despídete con calidez. Nunca te despidas sin verificar si hay algo pendiente.
 16. **Llama a \`escalar_a_humano\` en estos casos — sin excepción:**
@@ -768,7 +769,10 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
     }
 
     // ---- Final response --------------------------------------------------
-    const reply = choice.message.content || '';
+    // WhatsApp no renderiza links en formato markdown [texto](url) — se ven como
+    // texto roto con el link duplicado. Por si el modelo lo genera pese a la
+    // instrucción del prompt, lo convertimos a URL plana.
+    const reply = (choice.message.content || '').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$2');
     console.log(`🤖 Agent reply (${reply.length} chars)`);
 
     // ---- Escalation safety net -------------------------------------------
