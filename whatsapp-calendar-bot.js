@@ -1008,7 +1008,7 @@ function scheduleTextMessage(phone, message, options) {
 
     console.log(`⏱️  [DEBOUNCE] Procesando ${queued.messages.length} mensaje(s) agrupado(s) de ${phone}: "${combined}"`);
     processIncomingMessage(phone, combined, options).catch(err => {
-      if (err.message === 'BOT_INACTIVE_BLOCKED' || err.message === 'BOT_TEST_MODE_BLOCKED' || err.message === 'BOT_INVALID_MODE_BLOCKED') {
+      if (err.message === 'BOT_INACTIVE_BLOCKED' || err.message === 'BOT_TEST_MODE_BLOCKED' || err.message === 'BOT_INVALID_MODE_BLOCKED' || err.message === 'BOT_ACTIVE_MODE_TEST_PHONE_BLOCKED') {
         console.log(`⏸️  Mensaje bloqueado correctamente — ${err.message}`);
         return;
       }
@@ -1998,7 +1998,7 @@ app.post('/webhook', async (req, res) => {
           if (senderPhone && buttonId) {
             processIncomingMessage(senderPhone, buttonId, { isButtonClick: true, buttonTitle }).catch(error => {
               // Si el error es porque el bot está inactivo, no es un error real
-              if (error.message === 'BOT_INACTIVE_BLOCKED' || error.message === 'BOT_TEST_MODE_BLOCKED' || error.message === 'BOT_INVALID_MODE_BLOCKED') {
+              if (error.message === 'BOT_INACTIVE_BLOCKED' || error.message === 'BOT_TEST_MODE_BLOCKED' || error.message === 'BOT_INVALID_MODE_BLOCKED' || error.message === 'BOT_ACTIVE_MODE_TEST_PHONE_BLOCKED') {
                 console.log(`⏸️  Botón bloqueado correctamente - ${error.message}`);
                 return; // No loguear como error
               }
@@ -2342,6 +2342,20 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       console.log(`🧪 ============================================\n`);
     }
   } else if (botMode === 'active') {
+    // El número de pruebas NUNCA debe recibir respuestas en modo activo,
+    // solo en modo 'test'. Así se evita mezclar pruebas con producción real.
+    const exactMatchFull = cleanPhone === TEST_PHONE_FULL;
+    const exactMatchShort = cleanPhone === TEST_PHONE_SHORT;
+    const endsWithMatch = cleanPhone.length >= 10 && cleanPhone.length <= 12 && cleanPhone.endsWith(TEST_PHONE_SHORT);
+    const last10Digits = cleanPhone.length >= 10 ? cleanPhone.slice(-10) : cleanPhone;
+    const last10Match = last10Digits === TEST_PHONE_SHORT;
+    const isTestPhone = exactMatchFull || exactMatchShort || endsWithMatch || last10Match;
+
+    if (isTestPhone) {
+      console.log(`🧪 [BOT MODE CHECK] Bot ACTIVO pero el número es el de pruebas (${cleanPhone}) - BLOQUEADO`);
+      throw new Error('BOT_ACTIVE_MODE_TEST_PHONE_BLOCKED');
+    }
+
     console.log(`✅ [BOT MODE CHECK] Bot ACTIVO - Procesando mensaje normalmente\n`);
   } else {
     console.log(`⚠️  [BOT MODE CHECK] Modo desconocido: "${botMode}" - Procesando como activo\n`);

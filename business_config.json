@@ -48,6 +48,9 @@
 
   "precios": {
     "precio_base": 29000,
+    "techo_promocion": 30000,
+    "rango_tipico_min": 35000,
+    "rango_tipico_max": 39000,
     "moneda": "MXN",
     "nota": "El precio varía según modelo, forma de pago, fecha de compra, promociones y personalizaciones. No existen precios fijos por modelo — el precio final se define en el showroom según todos estos factores."
   },
@@ -119,7 +122,7 @@
     },
     {
       "pregunta": "¿Cuánto cuestan los vestidos? ¿Cuáles son los precios?",
-      "respuesta": "Nuestros vestidos inician desde $29,000 MXN y el precio varía dependiendo del modelo, la forma de pago, fecha de compra, promoción aplicada y personalizaciones finales. ✨\nNo hay nada como verlos en persona. 👰‍♀️",
+      "respuesta": "La mayoría de las novias invierten entre $35,000 y $39,000 MXN en su vestido. Con las promociones de tu asesora en cita, puedes conseguirlo por debajo de $30,000 ✨\nNo hay nada como verlos en persona. 👰‍♀️",
       "categoria": "Precios y Pagos"
     },
     {
@@ -237,7 +240,7 @@
 
     "catalogo": "¡Hola 👰‍♀️ Con gusto! 🤍 Aquí te dejo nuestro catálogo {catalogo_nombre}:\n{catalogo_link}\n\nPero te confieso algo... en persona es otra historia 😍 ¿Te gustaría agendar una cita para probar los que más te gusten?\n\nEstamos abiertos de {horario_lun_sab} y domingos de {horario_dom} 🕒",
 
-    "precios": "¡Hola! 🤍 Nuestros vestidos inician en ${precio_base} MXN y varía según el modelo, forma de pago, fecha de compra y algunas personalizaciones.\n\nLo mejor es verlo contigo en showroom, porque nuestras asesoras pueden conseguirte sorpresas especiales ✨\n\n¿Te gustaría agendar una cita? 👰‍♀️",
+    "precios": "¡Hola! 🤍 La mayoría de las novias invierten entre ${rango_tipico_min} y ${rango_tipico_max} MXN en su vestido. Con las promociones de tu asesora en cita, puedes conseguirlo por debajo de ${techo_promocion} ✨\n\nLo mejor es verlo contigo en showroom, porque nuestras asesoras pueden conseguirte sorpresas especiales ✨\n\n¿Te gustaría agendar una cita? 👰‍♀️",
 
     "ubicacion": "¡Claro! Estamos en 📍{direccion}, en un showroom pensado para que vivas tu elección con calma y estilo ✨\n\n¿Te gustaría agendar cita?\n\nEstamos abiertos de {horario_lun_sab} y domingos de {horario_dom} 🕒\n¿Me compartes tu nombre, fecha de boda y qué día/hora te gustaría visitarnos?",
 
