@@ -507,6 +507,40 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const { event_id, nueva_hora_inicio } = toolArgs;
       console.log(`🔧 Agent tool: reagendar_cita(${event_id} → ${nueva_hora_inicio})`);
 
+      // ── Validación de cupo antes de reagendar ──────────────────────────
+      // Mismo criterio único de disponibilidad que confirmar_cita: un horario
+      // está libre si y solo si todavía existe su evento azul (sin nombre) en
+      // el calendario "Innovia CDMX". Se valida ANTES de mover la cita — nunca
+      // se mueve a un horario sin evento azul confirmado.
+      const localTime = (iso) => (iso || '').slice(0, 16); // "YYYY-MM-DDTHH:MM"
+      const storedSlots = session.slots_disponibles || [];
+      const newAppointmentLocal = localTime(nueva_hora_inicio);
+      let matchingSlot = storedSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
+
+      // Fallback: if not found in session (session may be stale), fetch fresh slots for that date
+      if ((!matchingSlot || !matchingSlot.eventId) && innoviaCDMXCalendarId) {
+        console.log(`🔍 Slot no encontrado en sesión, buscando en calendario Innovia CDMX para: ${nueva_hora_inicio}`);
+        try {
+          const newDate = nueva_hora_inicio.split('T')[0]; // YYYY-MM-DD
+          const freshSlots = await getAvailableSlots(newDate, calendarClient, authClient, innoviaCDMXCalendarId, null);
+          matchingSlot = freshSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
+          if (matchingSlot) {
+            console.log(`✅ Slot encontrado en búsqueda fresca (ID: ${matchingSlot.eventId})`);
+          }
+        } catch (fetchErr) {
+          console.warn(`⚠️  Error buscando slots frescos: ${fetchErr.message}`);
+        }
+      }
+
+      if (!matchingSlot || !matchingSlot.eventId) {
+        console.warn(`⚠️  reagendar_cita bloqueada: no hay evento azul disponible para ${nueva_hora_inicio}`);
+        return {
+          exito: false,
+          error: 'Ese horario ya no tiene cupos disponibles. Busca disponibilidad de nuevo y ofrece otro horario.'
+        };
+      }
+      // ───────────────────────────────────────────────────────────────────
+
       // CRITICAL: Get the existing event BEFORE updating to know the old slot time
       const existingEvent = await getCalendarEventService(event_id, calendarClient, authClient, calendarId);
       const oldStartIso = existingEvent?.start?.dateTime || existingEvent?.start?.date || null;
@@ -534,35 +568,8 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         }
 
         // CRITICAL: Delete the blue event at the NEW slot (it's now occupied)
-        // Use local time comparison (YYYY-MM-DDTHH:MM) to avoid DST offset mismatches.
-        // Timestamp comparison breaks when stored slots use CST (-06:00) but the
-        // appointment is in CDT (-05:00) — a 1-hour diff that exceeds any ms tolerance.
-        const localTime = (iso) => (iso || '').slice(0, 16);
-        const storedSlots = session.slots_disponibles || [];
-        const newAppointmentLocal = localTime(nueva_hora_inicio);
-        let matchingSlot = storedSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
-
-        // Fallback: if not found in session (session may be stale), fetch fresh slots for that date
-        if ((!matchingSlot || !matchingSlot.eventId) && innoviaCDMXCalendarId) {
-          console.log(`🔍 Slot no encontrado en sesión, buscando en calendario Innovia CDMX para: ${nueva_hora_inicio}`);
-          try {
-            const newDate = nueva_hora_inicio.split('T')[0]; // YYYY-MM-DD
-            const freshSlots = await getAvailableSlots(newDate, calendarClient, authClient, innoviaCDMXCalendarId, null);
-            matchingSlot = freshSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
-            if (matchingSlot) {
-              console.log(`✅ Slot encontrado en búsqueda fresca (ID: ${matchingSlot.eventId})`);
-            }
-          } catch (fetchErr) {
-            console.warn(`⚠️  Error buscando slots frescos: ${fetchErr.message}`);
-          }
-        }
-
-        if (matchingSlot && matchingSlot.eventId) {
-          console.log(`🗑️  Eliminando slot azul del nuevo horario en Innovia CDMX (ID: ${matchingSlot.eventId})`);
-          await deleteCalendarEventService(matchingSlot.eventId, calendarClient, authClient, innoviaCDMXCalendarId);
-        } else {
-          console.warn(`⚠️  No se encontró slot azul coincidente para eliminar en hora: ${nueva_hora_inicio}`);
-        }
+        console.log(`🗑️  Eliminando slot azul del nuevo horario en Innovia CDMX (ID: ${matchingSlot.eventId})`);
+        await deleteCalendarEventService(matchingSlot.eventId, calendarClient, authClient, innoviaCDMXCalendarId);
 
         return {
           exito: true,
