@@ -665,6 +665,12 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
   const sessionUpdates = {};
   const MAX_ITERATIONS = 5;
 
+  // Tracks the outcome of the LAST confirmar_cita/reagendar_cita call this turn.
+  // The model sees the tool's exito:false result but can still hallucinate a
+  // success message in its final reply — this forces an honest response instead
+  // of trusting the LLM to faithfully relay a failed booking/reschedule.
+  let lastBookingFailureMessage = null;
+
   // Retry helper for transient OpenAI errors (rate limits, network issues, 5xx).
   // Retries up to MAX_RETRIES times with exponential backoff before giving up.
   const MAX_RETRIES = 3;
@@ -765,6 +771,9 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           sessionUpdates.calendar_event_id = result.event_id;
           sessionUpdates.fecha_cita = toolArgs.nueva_hora_inicio.split('T')[0];
         }
+        if (toolName === 'confirmar_cita' || toolName === 'reagendar_cita') {
+          lastBookingFailureMessage = result.exito ? null : 'Ese horario ya no tiene cupo disponible';
+        }
 
         messages.push({
           role: 'tool',
@@ -780,7 +789,18 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
     // WhatsApp no renderiza links en formato markdown [texto](url) — se ven como
     // texto roto con el link duplicado. Por si el modelo lo genera pese a la
     // instrucción del prompt, lo convertimos a URL plana.
-    const reply = (choice.message.content || '').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$2');
+    let reply = (choice.message.content || '').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$2');
+
+    // ---- Booking-failure safety net ---------------------------------------
+    // If the last confirmar_cita/reagendar_cita call this turn was blocked for
+    // lack of cupo real, never trust the model's own wording — force an honest
+    // reply. Otherwise a hallucinated "¡listo, tu cita quedó cambiada!" can slip
+    // through even though the calendar was never touched.
+    if (lastBookingFailureMessage) {
+      console.warn(`⚠️  [BOOKING SAFETY NET] Sobrescribiendo respuesta — última reserva/reagendado falló: ${lastBookingFailureMessage}`);
+      reply = `${lastBookingFailureMessage} 🙏 Déjame buscarte otro horario disponible — ¿qué día te queda mejor?`;
+    }
+
     console.log(`🤖 Agent reply (${reply.length} chars)`);
 
     // ---- Escalation safety net -------------------------------------------
