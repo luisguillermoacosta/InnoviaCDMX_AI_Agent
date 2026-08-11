@@ -412,23 +412,24 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
 
       // ── Validación de cupo antes de confirmar ──────────────────────────
       // Modelo único de disponibilidad: un horario está libre si y solo si
-      // todavía existe su evento azul (sin nombre) en el calendario "Innovia CDMX".
-      // Ese es el mismo criterio que usa getAvailableSlots al OFRECER horarios,
-      // así que ofrecer y confirmar nunca se contradicen.
-      const storedSlotsForCheck = session.slots_disponibles || [];
-      // Compare local date+time strings (YYYY-MM-DDTHH:MM) instead of timestamps.
-      // The LLM often uses the wrong UTC offset (e.g. -06:00 in DST months when
-      // CDMX is actually -05:00), which causes a 1-hour timestamp difference that
-      // exceeds any safe millisecond tolerance. Comparing the local portion ignores
-      // the offset entirely, which is correct because both values represent CDMX time.
+      // todavía existe su evento azul (sin nombre) en el calendario "Innovia CDMX"
+      // EN ESTE MOMENTO. Se re-consulta el calendario EN VIVO aquí — nunca se
+      // confía solo en session.slots_disponibles (la lista que se le mostró a
+      // la clienta al ofrecer horarios), porque esa caché puede quedar
+      // desactualizada entre que se ofrece un horario y que la clienta confirma
+      // (el cupo pudo haberse tomado mientras tanto, o nunca haber existido).
       const localTime = (iso) => (iso || '').slice(0, 16); // "YYYY-MM-DDTHH:MM"
       const appointmentLocal = localTime(hora_inicio);
-      const matchingSlotForCheck = storedSlotsForCheck.find(
-        s => localTime(s.start) === appointmentLocal
-      );
-      const hasBlueEvent = !!matchingSlotForCheck?.eventId;
+      const appointmentDateStr = hora_inicio.split('T')[0];
+      let matchingSlot = null;
+      try {
+        const freshSlots = await getAvailableSlots(appointmentDateStr, calendarClient, authClient, innoviaCDMXCalendarId, null);
+        matchingSlot = freshSlots.find(s => localTime(s.start) === appointmentLocal);
+      } catch (fetchErr) {
+        console.warn(`⚠️  Error verificando cupo en vivo para confirmar_cita: ${fetchErr.message}`);
+      }
 
-      if (!hasBlueEvent) {
+      if (!matchingSlot || !matchingSlot.eventId) {
         console.warn(`⚠️  confirmar_cita bloqueada: no hay evento azul disponible para ${hora_inicio}`);
         return {
           exito: false,
@@ -450,14 +451,9 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
 
       if (event) {
         // Eliminar el evento azul (slot disponible) del calendario Innovia CDMX
-        const storedSlots = session.slots_disponibles || [];
-        const matchingSlot = storedSlots.find(slot => localTime(slot.start) === appointmentLocal);
-        if (matchingSlot && matchingSlot.eventId) {
-          console.log(`🗑️  Eliminando slot azul del calendario Innovia CDMX (ID: ${matchingSlot.eventId})`);
-          await deleteCalendarEventService(matchingSlot.eventId, calendarClient, authClient, innoviaCDMXCalendarId);
-        } else {
-          console.warn(`⚠️  No se encontró slot azul coincidente para eliminar en hora: ${hora_inicio}`);
-        }
+        // (usamos el eventId confirmado en vivo arriba, no una búsqueda en caché)
+        console.log(`🗑️  Eliminando slot azul del calendario Innovia CDMX (ID: ${matchingSlot.eventId})`);
+        await deleteCalendarEventService(matchingSlot.eventId, calendarClient, authClient, innoviaCDMXCalendarId);
 
         // Calcular el día de semana correcto en zona horaria de México
         // (el LLM no debe calcular esto por su cuenta — puede equivocarse)
@@ -510,26 +506,19 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       // ── Validación de cupo antes de reagendar ──────────────────────────
       // Mismo criterio único de disponibilidad que confirmar_cita: un horario
       // está libre si y solo si todavía existe su evento azul (sin nombre) en
-      // el calendario "Innovia CDMX". Se valida ANTES de mover la cita — nunca
-      // se mueve a un horario sin evento azul confirmado.
+      // el calendario "Innovia CDMX" EN ESTE MOMENTO. Se re-consulta el
+      // calendario EN VIVO — nunca se confía en session.slots_disponibles
+      // (esa caché puede quedar desactualizada entre que se ofreció el
+      // horario y que la clienta confirmó el cambio).
       const localTime = (iso) => (iso || '').slice(0, 16); // "YYYY-MM-DDTHH:MM"
-      const storedSlots = session.slots_disponibles || [];
       const newAppointmentLocal = localTime(nueva_hora_inicio);
-      let matchingSlot = storedSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
-
-      // Fallback: if not found in session (session may be stale), fetch fresh slots for that date
-      if ((!matchingSlot || !matchingSlot.eventId) && innoviaCDMXCalendarId) {
-        console.log(`🔍 Slot no encontrado en sesión, buscando en calendario Innovia CDMX para: ${nueva_hora_inicio}`);
-        try {
-          const newDate = nueva_hora_inicio.split('T')[0]; // YYYY-MM-DD
-          const freshSlots = await getAvailableSlots(newDate, calendarClient, authClient, innoviaCDMXCalendarId, null);
-          matchingSlot = freshSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
-          if (matchingSlot) {
-            console.log(`✅ Slot encontrado en búsqueda fresca (ID: ${matchingSlot.eventId})`);
-          }
-        } catch (fetchErr) {
-          console.warn(`⚠️  Error buscando slots frescos: ${fetchErr.message}`);
-        }
+      const newAppointmentDateStr = nueva_hora_inicio.split('T')[0];
+      let matchingSlot = null;
+      try {
+        const freshSlots = await getAvailableSlots(newAppointmentDateStr, calendarClient, authClient, innoviaCDMXCalendarId, null);
+        matchingSlot = freshSlots.find(slot => localTime(slot.start) === newAppointmentLocal);
+      } catch (fetchErr) {
+        console.warn(`⚠️  Error verificando cupo en vivo para reagendar_cita: ${fetchErr.message}`);
       }
 
       if (!matchingSlot || !matchingSlot.eventId) {
