@@ -121,7 +121,7 @@
     },
     {
       "pregunta": "¿Cuánto cuestan los vestidos? ¿Cuáles son los precios?",
-      "respuesta": "En promedio, nuestras novias invierten $35,000 MXN en su vestido. Con promociones directas con tu asesora, puedes llegar a encontrar en menos de $30,000 ✨\n¿Te agendamos tu cita? 👰‍♀️",
+      "respuesta": "Nuestros vestidos, ya con promoción, inician en $30,000 MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales.\n\nLo mejor es verlo contigo en showroom, porque nuestras asesoras pueden conseguirte sorpresas especiales o descuentos exclusivos según el modelo y la fecha de tu compra ✨\n¿Te agendamos tu cita? 👰‍♀️",
       "categoria": "Precios y Pagos"
     },
     {
@@ -239,7 +239,7 @@
 
     "catalogo": "¡Hola 👰‍♀️ Con gusto! 🤍 Aquí te dejo nuestro catálogo {catalogo_nombre}:\n{catalogo_link}\n\nPero te confieso algo... en persona es otra historia 😍 ¿Te gustaría agendar una cita para probar los que más te gusten?\n\nEstamos abiertos de {horario_lun_sab} y domingos de {horario_dom} 🕒",
 
-    "precios": "¡Hola! 🤍 En promedio, nuestras novias invierten ${precio_promedio} MXN en su vestido. Con promociones directas con tu asesora, puedes llegar a encontrar en menos de ${techo_promocion} ✨\n\n¿Te agendamos tu cita? 👰‍♀️",
+    "precios": "¡Hola! 🤍 Nuestros vestidos, ya con promoción, inician en ${techo_promocion} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales.\n\nLo mejor es verlo contigo en showroom, porque nuestras asesoras pueden conseguirte sorpresas especiales o descuentos exclusivos según el modelo y la fecha de tu compra ✨\n\n¿Te agendamos tu cita? 👰‍♀️",
 
     "ubicacion": "¡Claro! Estamos en 📍{direccion}, en un showroom pensado para que vivas tu elección con calma y estilo ✨\n\n¿Te gustaría agendar cita?\n\nEstamos abiertos de {horario_lun_sab} y domingos de {horario_dom} 🕒\n¿Me compartes tu nombre, fecha de boda y qué día/hora te gustaría visitarnos?",
 
