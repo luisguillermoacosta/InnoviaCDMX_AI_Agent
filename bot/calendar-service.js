@@ -454,7 +454,14 @@ async function getAvailableSlots(date, calendarClient, authClient, innoviaCDMXCa
           console.log(`   ⏭️  ❌ EXCLUYENDO evento [${event.id}] - fecha incorrecta: ${eventDateFormatted} (solicitado: ${requestedDateFormatted}), Hora: ${startTimeCDMX}`);
           return false;
         }
-        
+
+        // CRITICAL: Nunca ofrecer/confirmar un horario que ya pasó (fecha u hora anterior a ahora)
+        if (event.start.getTime() < Date.now()) {
+          const startTimeCDMX = event.start.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: true });
+          console.log(`   ⏭️  ❌ EXCLUYENDO evento [${event.id}] - horario ya pasó: ${eventDateFormatted} ${startTimeCDMX}`);
+          return false;
+        }
+
         // CRITICAL: Solo considerar eventos que duran exactamente 90 minutos
         // 90 minutos = 90 * 60 * 1000 = 5,400,000 milisegundos
         const durationMs = event.end.getTime() - event.start.getTime();

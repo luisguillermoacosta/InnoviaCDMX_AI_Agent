@@ -289,6 +289,17 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const { fecha } = toolArgs;
       console.log(`🔧 Agent tool: buscar_slots_disponibles(${fecha})`);
 
+      // GUARD: nunca buscar/ofrecer disponibilidad en una fecha ya pasada.
+      const todayCDMX = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); // "YYYY-MM-DD"
+      if (fecha < todayCDMX) {
+        console.warn(`⚠️  buscar_slots_disponibles bloqueada: fecha en el pasado (${fecha}, hoy es ${todayCDMX})`);
+        return {
+          fecha,
+          slots_disponibles: [],
+          resultado: `La fecha ${fecha} ya pasó (hoy es ${todayCDMX}). No se puede ofrecer disponibilidad en fechas anteriores a hoy — pídele a la clienta una fecha a partir de hoy.`
+        };
+      }
+
       const slots = await getAvailableSlots(
         fecha,
         calendarClient,
@@ -424,6 +435,16 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const localTime = (iso) => (iso || '').slice(0, 16); // "YYYY-MM-DDTHH:MM"
       const appointmentLocal = localTime(hora_inicio);
       const appointmentDateStr = hora_inicio.split('T')[0];
+
+      // GUARD: nunca agendar una cita en una fecha/hora que ya pasó.
+      if (new Date(hora_inicio).getTime() < Date.now()) {
+        console.warn(`⚠️  confirmar_cita bloqueada: horario en el pasado (${hora_inicio})`);
+        return {
+          exito: false,
+          error: 'No se puede agendar una cita en una fecha u hora que ya pasó. Busca disponibilidad de nuevo y ofrece un horario futuro.'
+        };
+      }
+
       let matchingSlot = null;
       try {
         const freshSlots = await getAvailableSlots(appointmentDateStr, calendarClient, authClient, innoviaCDMXCalendarId, null);
@@ -516,6 +537,16 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const localTime = (iso) => (iso || '').slice(0, 16); // "YYYY-MM-DDTHH:MM"
       const newAppointmentLocal = localTime(nueva_hora_inicio);
       const newAppointmentDateStr = nueva_hora_inicio.split('T')[0];
+
+      // GUARD: nunca reagendar a una fecha/hora que ya pasó.
+      if (new Date(nueva_hora_inicio).getTime() < Date.now()) {
+        console.warn(`⚠️  reagendar_cita bloqueada: horario en el pasado (${nueva_hora_inicio})`);
+        return {
+          exito: false,
+          error: 'No se puede reagendar a una fecha u hora que ya pasó. Busca disponibilidad de nuevo y ofrece un horario futuro.'
+        };
+      }
+
       let matchingSlot = null;
       try {
         const freshSlots = await getAvailableSlots(newAppointmentDateStr, calendarClient, authClient, innoviaCDMXCalendarId, null);
