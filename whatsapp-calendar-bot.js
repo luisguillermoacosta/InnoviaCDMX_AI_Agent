@@ -26,6 +26,8 @@ const { extractAppointmentDate, parseDateFromText } = require('./date-parser');
 // Import new intent-based architecture
 const sheetsService = require('./bot/sheets-service');
 const { logPendingTask, getPendingTasks, resolvePendingTask, resolveMultipleTasks } = sheetsService;
+const waitlistService = require('./bot/waitlist-service');
+const { getWaitlist, resolveWaitlistEntry, resolveMultipleWaitlistEntries } = waitlistService;
 const { classifyIntent } = require('./bot/classifier');
 const { extractBrideProfile } = require('./bot/profile-extractor');
 const { handlers } = require('./bot/handlers');
@@ -378,6 +380,7 @@ app.use(express.static('public'));
 const CHAKRA_API_KEY = process.env.CHAKRA_API_KEY ? process.env.CHAKRA_API_KEY.trim().replace(/\s+/g, '') : null;
 const CHAKRA_PLUGIN_ID = process.env.CHAKRA_PLUGIN_ID ? process.env.CHAKRA_PLUGIN_ID.trim() : null;
 const CHAKRA_WHATSAPP_API_VERSION = process.env.CHAKRA_WHATSAPP_API_VERSION || 'v18.0';
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://innoviacdmxaiagent.up.railway.app').replace(/\/$/, '');
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'mi_token_seguro_123';
 
 // Admin phone number for escalations
@@ -1269,6 +1272,18 @@ async function sendWhatsAppMessage(phoneNumber, message, options = {}) {
           action: {
             buttons: buttons
           }
+        }
+      };
+    } else if (options.document && options.document.link) {
+      // Mensaje de documento (ej. catálogo en PDF)
+      payload = {
+        messaging_product: 'whatsapp',
+        to: cleanPhone,
+        type: 'document',
+        document: {
+          link: options.document.link,
+          filename: options.document.filename || 'documento.pdf',
+          ...(message ? { caption: message } : {})
         }
       };
     } else {
@@ -2717,6 +2732,21 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       sessions.addToHistory(cleanPhone, 'assistant', agentResult.reply);
     }
 
+    // Send the catalog PDF as a document attachment, if the agent requested it this turn
+    if (agentResult.sendCatalogPdf) {
+      try {
+        await sendWhatsAppMessage(cleanPhone, '', {
+          document: {
+            link: `${PUBLIC_BASE_URL}/catalogo-innovia.pdf`,
+            filename: 'Catálogo Innovia CDMX.pdf'
+          }
+        });
+        sessions.addToHistory(cleanPhone, 'assistant', '[Catálogo PDF enviado]');
+      } catch (pdfError) {
+        console.error(`❌ No se pudo enviar el catálogo PDF a ${cleanPhone}:`, pdfError.message);
+      }
+    }
+
     // Persist any session changes produced by tool calls
     if (agentResult.sessionUpdates && Object.keys(agentResult.sessionUpdates).length > 0) {
       sessions.updateSession(cleanPhone, agentResult.sessionUpdates);
@@ -3875,6 +3905,46 @@ app.delete('/api/pending-tasks', express.json(), (req, res) => {
   }
 });
 
+// GET /api/waitlist — Lista de espera de sábados/domingos (in-memory)
+app.get('/api/waitlist', (req, res) => {
+  try {
+    const entries = getWaitlist();
+    res.json({ entries });
+  } catch (error) {
+    console.error('Error en /api/waitlist:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/waitlist/:id — Marcar entrada como resuelta
+app.delete('/api/waitlist/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ error: 'id inválido' });
+    }
+    resolveWaitlistEntry(id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error resolviendo entrada de lista de espera:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/waitlist — Marcar múltiples entradas como resueltas
+// Body: { ids: [1, 2, 3] }  (si no se envían ids, resuelve todas)
+app.delete('/api/waitlist', express.json(), (req, res) => {
+  try {
+    const allEntries = getWaitlist();
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Boolean) : allEntries.map(e => e.id);
+    resolveMultipleWaitlistEntries(ids);
+    res.json({ success: true, resolved: ids.length });
+  } catch (error) {
+    console.error('Error resolviendo entradas de lista de espera en bulk:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Exportar snapshot de toda la data en memoria (sesiones + tareas pendientes)
 app.get('/api/export-snapshot', (req, res) => {
   const { getAllSessions } = require('./sessions');
@@ -4024,7 +4094,7 @@ const PORT = process.env.PORT || 3000;
 
 // Inicializar Google Calendar antes de iniciar el servidor
 initGoogleAuth()
-  .then(() => Promise.all([sessions.init(), sheetsService.init(), initBizConfig()]))
+  .then(() => Promise.all([sessions.init(), sheetsService.init(), waitlistService.init(), initBizConfig()]))
   .then(() => loadRuntimePhones())
   .then(() => {
   app.listen(PORT, () => {

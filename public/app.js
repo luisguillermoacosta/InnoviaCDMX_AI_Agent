@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
             loadAppointments();
         } else if (activeTab === 'pending-tasks') {
             loadPendingTasks();
+        } else if (activeTab === 'waitlist') {
+            loadWaitlist();
         }
     }, 10000);
 });
@@ -80,6 +82,8 @@ function initTabs() {
                 loadAppointments();
             } else if (targetTab === 'pending-tasks') {
                 loadPendingTasks();
+            } else if (targetTab === 'waitlist') {
+                loadWaitlist();
             } else if (targetTab === 'messages') {
                 loadFAQs();
             } else if (targetTab === 'logs') {
@@ -1712,6 +1716,196 @@ async function resolvePendingTask(id) {
         console.error('Error resolviendo tarea:', error);
         if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
         alert('Error al resolver la tarea. Intenta de nuevo.');
+    }
+}
+
+// ── Lista de Espera (sábados/domingos) ──────────────────────────────────────
+
+let _waitlistData = [];
+
+async function loadWaitlist() {
+    const container = document.getElementById('waitlist-list');
+    const toolbar = document.getElementById('waitlist-toolbar');
+    if (!container) return;
+    container.innerHTML = '<p class="loading-text">Cargando lista de espera...</p>';
+
+    try {
+        const response = await fetch('/api/waitlist');
+        const data = await response.json();
+
+        _waitlistData = data.entries || [];
+
+        if (_waitlistData.length === 0) {
+            if (toolbar) toolbar.style.display = 'none';
+            container.innerHTML = '<p class="loading-text" style="color:#28a745;">✅ No hay nadie en lista de espera</p>';
+            return;
+        }
+
+        if (toolbar) toolbar.style.display = 'flex';
+
+        const selectAll = document.getElementById('select-all-waitlist');
+        if (selectAll) selectAll.checked = false;
+        _updateWaitlistSelectedCount();
+
+        container.innerHTML = _waitlistData.map(entry => `
+            <div class="appointment-card" id="waitlist-row-${entry.id}" style="border-left: 4px solid #f0ad4e;">
+                <div style="display:flex; align-items:center; padding-right:12px;">
+                    <input type="checkbox" class="waitlist-checkbox" data-id="${entry.id}" onchange="_updateWaitlistSelectedCount()" style="width:16px; height:16px; cursor:pointer;">
+                </div>
+                <div class="appointment-info" style="flex:1;">
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+                        <span style="font-weight:700; font-size:15px;">${escapeHtml(entry.nombre || 'Sin nombre')}</span>
+                        <span style="font-size:12px; color:#6c757d; background:#f8f9fa; padding:2px 8px; border-radius:12px;">📞 ${escapeHtml(entry.telefono)}</span>
+                    </div>
+                    <p style="margin:0 0 6px 0; font-size:14px; color:var(--text-primary);">📅 <strong>Día deseado:</strong> ${escapeHtml(entry.fechaDeseada)}${entry.horaDeseada ? ` a las ${escapeHtml(entry.horaDeseada)}` : ' (flexible)'}</p>
+                    ${entry.fechaBoda ? `<p style="margin:0 0 6px 0; font-size:13px; color:var(--text-secondary);">💍 Boda: ${escapeHtml(entry.fechaBoda)}</p>` : ''}
+                    ${entry.notas ? `<p style="margin:0 0 6px 0; font-size:12px; color:var(--text-secondary); background:var(--bg-secondary); padding:6px 10px; border-radius:6px;">🗂 ${escapeHtml(entry.notas)}</p>` : ''}
+                    <p style="margin:0; font-size:12px; color:var(--text-light);">🕐 Anotada el ${escapeHtml(entry.fecha)} a las ${escapeHtml(entry.hora)}</p>
+                </div>
+                <div style="display:flex; align-items:center; padding-left:16px;">
+                    <button onclick="resolveWaitlistEntry(${entry.id})" style="padding:8px 16px; background:#28a745; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap;">
+                        ✅ Resolver
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando lista de espera:', error);
+        container.innerHTML = '<p class="loading-text" style="color:#dc3545;">Error al cargar la lista de espera</p>';
+    }
+}
+
+function _updateWaitlistSelectedCount() {
+    const checkboxes = document.querySelectorAll('.waitlist-checkbox');
+    const checked = document.querySelectorAll('.waitlist-checkbox:checked');
+    const countEl = document.getElementById('waitlist-selected-count');
+    const selectAll = document.getElementById('select-all-waitlist');
+    const btnDelete = document.getElementById('btn-delete-selected-waitlist');
+
+    if (countEl) {
+        countEl.textContent = checked.length > 0 ? `${checked.length} de ${checkboxes.length} seleccionadas` : '';
+    }
+    if (selectAll) {
+        selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+    }
+    if (btnDelete) {
+        btnDelete.disabled = checked.length === 0;
+        btnDelete.style.opacity = checked.length === 0 ? '0.5' : '1';
+    }
+}
+
+function toggleSelectAllWaitlist(checked) {
+    document.querySelectorAll('.waitlist-checkbox').forEach(cb => { cb.checked = checked; });
+    _updateWaitlistSelectedCount();
+}
+
+function downloadWaitlistExcel() {
+    if (_waitlistData.length === 0) return;
+
+    const headers = ['ID', 'Anotada el', 'Hora', 'Nombre', 'Teléfono', 'Día deseado', 'Hora deseada', 'Fecha de boda', 'Notas', 'Estado'];
+    const rows = _waitlistData.map(e => [
+        e.id,
+        e.fecha,
+        e.hora,
+        e.nombre || '',
+        e.telefono,
+        e.fechaDeseada,
+        e.horaDeseada || '',
+        e.fechaBoda || '',
+        e.notas || '',
+        e.estado
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws['!cols'] = [
+        { wch: 5  },
+        { wch: 12 },
+        { wch: 8  },
+        { wch: 22 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 40 },
+        { wch: 12 },
+    ];
+
+    const headerStyle = {
+        font:      { bold: true, color: { rgb: 'FFFFFF' } },
+        fill:      { fgColor: { rgb: '1E3A5F' } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+        border: {
+            bottom: { style: 'thin', color: { rgb: 'FFFFFF' } }
+        }
+    };
+    headers.forEach((_, col) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (ws[cellRef]) ws[cellRef].s = headerStyle;
+    });
+
+    const rowStyle      = { alignment: { vertical: 'top', wrapText: true } };
+    const rowStyleAlt   = { fill: { fgColor: { rgb: 'F1F5F9' } }, alignment: { vertical: 'top', wrapText: true } };
+    rows.forEach((_, r) => {
+        headers.forEach((__, c) => {
+            const cellRef = XLSX.utils.encode_cell({ r: r + 1, c });
+            if (ws[cellRef]) ws[cellRef].s = (r % 2 === 0) ? rowStyle : rowStyleAlt;
+        });
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Lista de Espera');
+
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `lista-de-espera-${fecha}.xlsx`);
+}
+
+async function deleteSelectedWaitlist() {
+    const checked = document.querySelectorAll('.waitlist-checkbox:checked');
+    if (checked.length === 0) return;
+
+    const ids = Array.from(checked).map(cb => parseInt(cb.dataset.id));
+    const confirmMsg = ids.length === _waitlistData.length
+        ? `¿Eliminar a las ${ids.length} personas de la lista de espera?`
+        : `¿Eliminar a las ${ids.length} seleccionadas de la lista de espera?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const btnDelete = document.getElementById('btn-delete-selected-waitlist');
+    if (btnDelete) { btnDelete.disabled = true; btnDelete.textContent = 'Eliminando...'; }
+
+    try {
+        const response = await fetch('/api/waitlist', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        if (!response.ok) throw new Error('Error del servidor');
+        await loadWaitlist();
+    } catch (error) {
+        console.error('Error eliminando de lista de espera:', error);
+        alert('Error al eliminar. Intenta de nuevo.');
+        if (btnDelete) { btnDelete.disabled = false; btnDelete.textContent = '🗑 Eliminar seleccionadas'; }
+    }
+}
+
+async function resolveWaitlistEntry(id) {
+    const card = document.getElementById(`waitlist-row-${id}`);
+    if (card) {
+        card.style.opacity = '0.5';
+        card.style.pointerEvents = 'none';
+    }
+
+    try {
+        const response = await fetch(`/api/waitlist/${id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Error del servidor');
+        await loadWaitlist();
+    } catch (error) {
+        console.error('Error resolviendo entrada de lista de espera:', error);
+        if (card) { card.style.opacity = '1'; card.style.pointerEvents = ''; }
+        alert('Error al resolver. Intenta de nuevo.');
     }
 }
 

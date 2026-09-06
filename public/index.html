@@ -39,6 +39,7 @@
             <button class="tab-btn" data-tab="embudo">🎯 Embudo</button>
             <button class="tab-btn" data-tab="appointments">📅 Citas</button>
             <button class="tab-btn" data-tab="pending-tasks">🚨 Tareas Pendientes</button>
+            <button class="tab-btn" data-tab="waitlist">📝 Lista de Espera</button>
             <button class="tab-btn" data-tab="messages">❓ Help Center Info</button>
             <button class="tab-btn" data-tab="logs">📋 Logs</button>
             <button class="tab-btn" data-tab="config">⚙️ Configuración</button>
@@ -236,6 +237,34 @@
                 </div>
                 <div id="pending-tasks-list">
                     <p class="loading-text">Cargando tareas...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Lista de Espera -->
+        <div id="waitlist" class="tab-content">
+            <div class="section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <h2>📝 Lista de Espera</h2>
+                    <button onclick="loadWaitlist()" class="btn-primary" style="padding:8px 16px;">🔄 Actualizar</button>
+                </div>
+                <p class="section-description" style="margin-bottom:16px;">Novias que quieren un sábado/domingo sin cupo, o una hora ya ocupada. Contáctalas si se libera un lugar.</p>
+                <!-- Toolbar de acciones -->
+                <div id="waitlist-toolbar" style="display:none; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; background:var(--bg-secondary); border-radius:10px; margin-bottom:16px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600; user-select:none;">
+                        <input type="checkbox" id="select-all-waitlist" onchange="toggleSelectAllWaitlist(this.checked)" style="width:16px; height:16px; cursor:pointer;">
+                        Seleccionar todas
+                    </label>
+                    <span id="waitlist-selected-count" style="font-size:13px; color:var(--text-secondary); margin-right:auto;"></span>
+                    <button onclick="downloadWaitlistExcel()" style="padding:8px 16px; background:#217346; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">
+                        📥 Descargar Excel
+                    </button>
+                    <button onclick="deleteSelectedWaitlist()" id="btn-delete-selected-waitlist" style="padding:8px 16px; background:#dc3545; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600;">
+                        🗑 Eliminar seleccionadas
+                    </button>
+                </div>
+                <div id="waitlist-list">
+                    <p class="loading-text">Cargando lista de espera...</p>
                 </div>
             </div>
         </div>

@@ -31,6 +31,22 @@ async function createTables() {
     `);
     console.log('✅ Tabla pending_tasks creada');
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS waitlist (
+        id             SERIAL PRIMARY KEY,
+        phone          TEXT NOT NULL,
+        nombre         TEXT,
+        fecha_deseada  TEXT NOT NULL,
+        hora_deseada   TEXT,
+        fecha_boda     TEXT,
+        notas          TEXT,
+        estado         TEXT NOT NULL DEFAULT 'Pendiente',
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        resolved_at    TIMESTAMPTZ
+      )
+    `);
+    console.log('✅ Tabla waitlist creada');
+
     console.log('\n🎉 Base de datos lista.');
   } finally {
     client.release();

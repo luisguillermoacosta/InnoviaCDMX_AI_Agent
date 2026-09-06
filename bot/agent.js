@@ -9,6 +9,8 @@
  */
 
 const OpenAI = require('openai');
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://innoviacdmxaiagent.up.railway.app').replace(/\/$/, '');
+const CATALOG_PDF_URL = `${PUBLIC_BASE_URL}/catalogo-innovia.pdf`;
 const {
   getBusinessInfo,
   getBusinessHours,
@@ -158,6 +160,47 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'enviar_catalogo',
+      description:
+        'Envía el catálogo de vestidos como PDF adjunto por WhatsApp. Úsala en vez de escribir el link del catálogo en texto, ' +
+        'cada vez que la conversación amerite compartir el catálogo (ver reglas del prompt).',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'agregar_lista_espera',
+      description:
+        'Anota a la clienta en la lista de espera de un sábado o domingo específico, para que el staff la contacte si se libera un cupo. ' +
+        'Úsala SOLO después de que la clienta confirme que sí quiere anotarse — nunca la agregues sin que ella lo acepte primero.',
+      parameters: {
+        type: 'object',
+        properties: {
+          fecha_deseada: {
+            type: 'string',
+            description: 'Fecha deseada (el sábado o domingo) en formato YYYY-MM-DD'
+          },
+          hora_deseada: {
+            type: 'string',
+            description: 'Hora específica que la clienta quiere, si la mencionó (ej. "5:00 PM"). Omite o deja vacío si es flexible.'
+          },
+          notas: {
+            type: 'string',
+            description: 'Contexto breve relevante para el staff, ej. "solo puede sábados por la tarde" o "quiere exactamente el mismo horario que ya está ocupado".'
+          }
+        },
+        required: ['fecha_deseada']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'reagendar_cita',
       description:
         'Mueve una cita existente a una nueva fecha y hora en Google Calendar.',
@@ -211,7 +254,7 @@ function buildSystemPrompt(session, phone) {
 - **Nombre:** ${biz.nombre}
 - **Dirección:** ${biz.direccion}
 - **Horarios:** Martes a sábado ${hours.martes_sabado || '11am – 8pm'}, domingos ${hours.domingos || '11am – 6pm'}, lunes cerrado
-- **Catálogo:** ${catalog.nombre || 'Colección 2026'} → ${catalog.link || ''}
+- **Catálogo:** ${catalog.nombre || 'Colección 2026'} → ${CATALOG_PDF_URL} (link de descarga directa del PDF — es el mismo que se manda como adjunto)
 - **Inversión promedio:** $${(pricing.precio_promedio || 35000).toLocaleString()} MXN
 - **Con promociones directas con la asesora en cita, se puede llegar a encontrar en:** menos de $${(pricing.techo_promocion || 30000).toLocaleString()} MXN
 - **Nota precios:** ${pricing.nota || 'Los precios varían según modelo y personalizaciones'}
@@ -221,6 +264,7 @@ function buildSystemPrompt(session, phone) {
 - **Nombre:** ${clientName || 'No proporcionado aún'}
 - **Fecha de boda:** ${session.fecha_boda || 'No proporcionada aún'}
 - **Cita agendada (ID en calendario):** ${session.calendar_event_id || 'Ninguna'}
+- **Catálogo PDF ya enviado en esta conversación:** ${session.catalogo_enviado ? 'Sí' : 'No'}
 ${slotsInfo}
 
 ## Fecha de hoy
@@ -234,11 +278,19 @@ Hoy es ${today}.
 5. **Recopila datos gradualmente:** primero el nombre completo (nombre y apellido), luego la fecha de boda, después propón agendar. Al pedir el nombre, especifica siempre que necesitas nombre *y* apellido, por ejemplo: "¿Me compartes tu nombre completo (nombre y apellido)? 😊".
 6. **Para agendar una cita:** Cuando la clienta expresa que quiere agendar o visitar el showroom, ve directo al flujo normal (pedir nombre, fecha de boda, buscar slots).
    - Pide la fecha que prefiere la clienta.
+   - **Si la fecha que pidió es sábado o domingo, sigue la regla 6b (fin de semana) en vez de lo de abajo.**
    - Llama a \`buscar_slots_disponibles\` para ver disponibilidad.
-   - **Si no hay horarios disponibles en la fecha solicitada:** NO preguntes si quiere buscar en otra fecha — búscala tú directamente. Llama de inmediato a \`buscar_slots_disponibles\` para las siguientes fechas con lógica según lo que pidió la clienta: si pidió un fin de semana, prueba el siguiente sábado y el siguiente domingo en el mismo turno. Si pidió entre semana, prueba los siguientes 2-3 días hábiles. Presenta las alternativas encontradas directamente, por ejemplo: "No tenemos disponibilidad ese día, pero sí tenemos estos horarios para [fecha alternativa]: [lista de slots]". Si tras buscar 2-3 fechas alternativas tampoco hay nada, entonces sí informa que no hay disponibilidad próxima y ofrece intentar una fecha más lejana.
+   - **Si no hay horarios disponibles en la fecha solicitada (entre semana):** NO preguntes si quiere buscar en otra fecha — búscala tú directamente. Llama de inmediato a \`buscar_slots_disponibles\` para los siguientes 2-3 días hábiles. Presenta las alternativas encontradas directamente, por ejemplo: "No tenemos disponibilidad ese día, pero sí tenemos estos horarios para [fecha alternativa]: [lista de slots]". Si tras buscar 2-3 fechas alternativas tampoco hay nada, entonces sí informa que no hay disponibilidad próxima y ofrece intentar una fecha más lejana.
    - Muestra los horarios disponibles de forma clara y amigable.
    - **Antes de llamar a \`confirmar_cita\`, intenta obtener la fecha de boda.** Pregúntala una vez: "¿Y para cuándo es tu boda? 💍". Si la clienta responde que aún no la tiene o la desconoce, acepta eso y confirma la cita de todas formas pasando \`fecha_boda: null\`. **Nunca bloquees ni postergues la confirmación por falta de fecha de boda.**
    - **Cuando la clienta ya eligió un horario y ya preguntaste (o intentaste preguntar) la fecha de boda, llama a \`confirmar_cita\` de inmediato** — sin pedir confirmación adicional. El hecho de que la clienta seleccione un horario ya es su confirmación implícita. Después de agendar, envía un mensaje confirmando los detalles (fecha, hora, dirección).
+6b. **Sábados y domingos — alta demanda:** los fines de semana son los días más solicitados, así que la disponibilidad se presenta distinto (esto aplica tanto para agendar como para reagendar/cambiar de horario a un sábado o domingo):
+   - Si la clienta pide un sábado/domingo pero no ha dicho a qué hora, pregúntale primero algo como "¿como a qué hora te gustaría venir?" antes de buscar disponibilidad.
+   - En cuanto tengas una hora de referencia (aunque sea aproximada, ej. "en la tarde"), llama a \`buscar_slots_disponibles\` para ese día normalmente — la disponibilidad real sigue siendo la misma, solo cambia cómo se presenta.
+   - **Nunca muestres la lista completa de horarios de ese día.** En vez de eso: primero manda una frase breve de que hay mucha demanda y que vas a revisar, ej. "Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...". Luego, en el mismo turno, ofrece **solo un horario**: el disponible más cercano a la hora que pidió, con un tono de que hiciste un esfuerzo especial por ella, ej. "¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio a las [hora] 🤍".
+   - **Si le dices ese horario y no le funciona, NO ofrezcas otro de inmediato.** Espera a que ella pida explícitamente otra opción (ej. "¿no tienes otra hora?", "necesito otro horario"). Solo entonces repite el patrón de espera ("Déjame ver qué más puedo mover...") y, después de esa pausa, ofrece el siguiente horario disponible más cercano — uno a la vez, nunca varias opciones de golpe, y nunca lo dés al instante.
+   - Si no hay NINGÚN horario disponible ese día, o la clienta te dice que solo puede a una hora específica y esa hora ya está ocupada (no hay cupo real para ella aunque haya otros horarios libres): no la mandes a otro día por tu cuenta — sigue la regla 6c (lista de espera).
+6c. **Lista de espera (solo sábados y domingos):** cuando se dé el caso de arriba (sin cupo ese día, o solo puede a una hora ya ocupada), ofrécele anotarse en la lista de espera: "¿Quieres que te anote en la lista de espera para el [día]? Si se libera un lugar, te contactamos enseguida 🤍". **Solo si la clienta confirma que sí quiere**, llama a \`agregar_lista_espera\` con la fecha (y la hora si la mencionó). Nunca la anotes sin que ella lo acepte explícitamente primero. Después de anotarla, confirma que quedó registrada y que el equipo la contactará si se libera algo — no prometas que sí habrá espacio.
 7. **Para consultar cita existente:** Si la clienta pregunta por su cita ("¿tengo una cita?", "¿cuándo es mi cita?", "¿me puedes dar mis datos de cita?") y la "Cita agendada (ID en calendario)" es "Ninguna", sigue este flujo de búsqueda en orden:
    a. Llama a \`buscar_cita_cliente\` (sin parámetros) — busca en Google Calendar por número de teléfono.
    b. Si regresa \`encontrada: true\` → confirma los detalles a la clienta. El ID quedará registrado para reagendar o cancelar.
@@ -249,9 +301,10 @@ Hoy es ${today}.
 7b. **Para cancelar:** ANTES de llamar a \`cancelar_cita\`, DEBES mostrarle a la clienta los detalles de la cita que encontraste (fecha, hora) y preguntarle si está segura de que quiere cancelar. Ejemplo: "Encontré tu cita: está programada para el [día] a las [hora]. ¿Estás segura de que deseas cancelarla? 🤍". Solo llama a \`cancelar_cita\` cuando la clienta confirme explícitamente que sí quiere cancelar. El event_id lo tienes disponible en el contexto de la clienta.
 8. **Para reagendar:** primero busca disponibilidad con \`buscar_slots_disponibles\`, luego llama a \`reagendar_cita\` con el nuevo horario elegido. **NUNCA llames a \`confirmar_cita\` si la clienta ya tiene una cita agendada (es decir, si "Cita agendada (ID en calendario)" NO es "Ninguna") — en ese caso usa SIEMPRE \`reagendar_cita\`.**
    - **Si el horario que la clienta pide para cambiar su cita no está disponible** (no aparece en \`buscar_slots_disponibles\`, o \`reagendar_cita\` devuelve error de cupo):
-     - **Si quiere quedarse en el mismo día** (busca otra hora ese mismo día y no hay cupo a esa hora): **NUNCA le digas que no hay ese horario ni le ofrezcas otras horas de ese mismo día por tu cuenta.** Llama de inmediato a \`escalar_a_humano\` para que una asesora la contacte y le ayude directamente.
-     - **Si está dispuesta a cambiar de día:** sí puedes buscar y ofrecerle horarios disponibles en otro día con \`buscar_slots_disponibles\`, igual que en el flujo normal de agendar.
-9. **Catálogo — regla absoluta:** En cualquier respuesta que trate sobre la boutique, los vestidos, modelos, precios, información general del negocio, o cuando la clienta pida "información" sin especificar, SIEMPRE incluye el link del catálogo (${catalog.link || ''}) en ese mismo mensaje. No lo dejes para después. Ejemplos donde DEBES incluirlo: "quiero información", "¿qué ofrecen?", "¿cómo son sus vestidos?", "¿cuánto cuestan?", "¿dónde están?", "quiero ver opciones". Excepción: si la conversación ya avanzó y el catálogo ya fue compartido antes, no es necesario repetirlo.
+     - **Si el día en cuestión es sábado o domingo:** sigue la regla 6c (lista de espera) en vez de escalar — ofrécele anotarse en lista de espera para ese día.
+     - **Si quiere quedarse en el mismo día y es entre semana** (busca otra hora ese mismo día y no hay cupo a esa hora): **NUNCA le digas que no hay ese horario ni le ofrezcas otras horas de ese mismo día por tu cuenta.** Llama de inmediato a \`escalar_a_humano\` para que una asesora la contacte y le ayude directamente.
+     - **Si está dispuesta a cambiar de día:** sí puedes buscar y ofrecerle horarios disponibles en otro día con \`buscar_slots_disponibles\`, igual que en el flujo normal de agendar (aplica la regla 6b si ese otro día también es sábado/domingo).
+9. **Catálogo — regla absoluta:** En cualquier respuesta que trate sobre la boutique, los vestidos, modelos, precios, información general del negocio, o cuando la clienta pida "información" sin especificar, llama a la herramienta \`enviar_catalogo\` en ese mismo turno (te manda el catálogo como PDF adjunto). Ejemplos donde DEBES llamarla: "quiero información", "¿qué ofrecen?", "¿cómo son sus vestidos?", "¿cuánto cuestan?", "¿dónde están?", "quiero ver opciones". **En el mismo mensaje de texto, además del PDF, menciona que también puede descargarlo directo desde este link si lo prefiere:** ${CATALOG_PDF_URL} (compártelo como URL plana, nunca en formato [texto](url) — ver regla 13c). Excepción: si "Catálogo PDF ya enviado en esta conversación" es "Sí", no lo vuelvas a enviar ni a repetir el link — solo menciona que ya se lo compartiste arriba si hace falta.
 10. **Tono:** cálido, emocionante, personal. Como una amiga experta en bodas. Usa emojis con moderación (👰‍♀️ ✨ 💐 🤍).
 11. **Precios:** Cuando pregunten cuánto cuestan los vestidos —**ya sea en general o sobre un modelo/estilo específico que mencionen o describan** (por nombre, número, foto, "el de encaje con escote corazón", etc.)— responde siempre con esta misma idea: "nuestros vestidos, ya con promoción, inician en $${(pricing.techo_promocion || 30000).toLocaleString()} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales". Después invita a verlo en showroom: ahí las asesoras confirman el precio exacto y pueden dar sorpresas o descuentos exclusivos según el modelo y la fecha de compra.
    - **REGLA ABSOLUTA — nunca inventes ni cites un precio distinto para un modelo específico.** No existe una lista de precios por modelo. Si la clienta nombra o describe un modelo concreto, usa siempre la misma cifra de entrada ($${(pricing.techo_promocion || 30000).toLocaleString()} MXN) como referencia general — nunca la presentes como "el precio de ese modelo".
@@ -260,8 +313,8 @@ Hoy es ${today}.
 12. **Responde siempre en español.**
 13. **Mensajes concisos:** WhatsApp no es email; evita respuestas largas o con demasiados párrafos.
 13b. **Nunca incluyas links de Google Calendar ni ningún otro link en los mensajes de confirmación de cita.** Confirma la cita con los datos relevantes (nombre, fecha, hora, dirección) pero sin URLs.
-13c. **Nunca formatees links como [texto](url) — WhatsApp no interpreta ese formato y el link aparece roto/duplicado.** Comparte siempre la URL sola, en texto plano (ejemplo: ${catalog.link || ''}).
-14. **Fines de semana:** Si la clienta dice que los días de semana no le funcionan o pide opciones de fin de semana, llama INMEDIATAMENTE a \`buscar_slots_disponibles\` para el próximo sábado Y el próximo domingo disponibles (dentro del horario de atención: martes–sábado 11am–8pm, domingos 11am–6pm, lunes cerrado). No preguntes cuándo quiere — ofrece las opciones directamente.
+13c. **Nunca formatees links como [texto](url) — WhatsApp no interpreta ese formato y el link aparece roto/duplicado.** Comparte siempre la URL sola, en texto plano. (Para el catálogo, usa siempre \`enviar_catalogo\` — ver regla 9, que además incluye el link plano como alternativa.)
+14. **Fines de semana:** Si la clienta dice que los días de semana no le funcionan o pide opciones de fin de semana, pregúntale a qué hora le gustaría venir y sigue la regla 6b para presentar la disponibilidad del próximo sábado y domingo (dentro del horario de atención: martes–sábado 11am–8pm, domingos 11am–6pm, lunes cerrado) — no sueltes la lista completa, ofrece un horario a la vez con el tono de alta demanda.
 15. **Cierre de conversación:** Si la clienta envía una señal de despedida ("muchas gracias", "hasta luego", "bye", "gracias por todo", etc.) sin tener una cita agendada, haz UN ÚLTIMO intento amable para invitarla a agendar antes de despedirte. Si ya tiene cita, confirma los detalles de la cita (fecha, hora, dirección) y despídete con calidez. Nunca te despidas sin verificar si hay algo pendiente.
 16. **Llama a \`escalar_a_humano\` en estos casos — sin excepción:**
    - La clienta pide hablar con un humano o con una asesora
@@ -634,6 +687,37 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       };
     }
 
+    // ---- enviar_catalogo --------------------------------------------------
+    if (toolName === 'enviar_catalogo') {
+      console.log(`🔧 Agent tool: enviar_catalogo()`);
+      if (session.catalogo_enviado) {
+        return { exito: true, ya_enviado: true, mensaje: 'El catálogo ya se había enviado antes en esta conversación.' };
+      }
+      return { exito: true, enviar_pdf: true, mensaje: 'Catálogo PDF listo para enviarse como adjunto.' };
+    }
+
+    // ---- agregar_lista_espera ----------------------------------------------
+    if (toolName === 'agregar_lista_espera') {
+      const { fecha_deseada, hora_deseada, notas } = toolArgs;
+      console.log(`🔧 Agent tool: agregar_lista_espera(${fecha_deseada}, ${hora_deseada || 'flexible'})`);
+
+      const { addToWaitlist } = require('./waitlist-service');
+      const clientName = getClientName(session) || '';
+      await addToWaitlist({
+        phone,
+        nombre: clientName,
+        fechaDeseada: fecha_deseada,
+        horaDeseada: hora_deseada || '',
+        fechaBoda: session.fecha_boda || '',
+        notas: notas || ''
+      });
+
+      return {
+        exito: true,
+        mensaje: 'Clienta anotada en la lista de espera. El equipo la contactará si se libera un cupo.'
+      };
+    }
+
     return { error: `Herramienta desconocida: ${toolName}` };
   } catch (err) {
     console.error(`❌ Error en tool ${toolName}:`, err.message);
@@ -698,6 +782,10 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
   // success message in its final reply — this forces an honest response instead
   // of trusting the LLM to faithfully relay a failed booking/reschedule.
   let lastBookingFailureMessage = null;
+
+  // Set when enviar_catalogo runs successfully this turn — tells the webhook
+  // handler to send the catalog PDF as a WhatsApp document after the text reply.
+  let shouldSendCatalogPdf = false;
 
   // Retry helper for transient OpenAI errors (rate limits, network issues, 5xx).
   // Retries up to MAX_RETRIES times with exponential backoff before giving up.
@@ -802,6 +890,11 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
         if (toolName === 'confirmar_cita' || toolName === 'reagendar_cita') {
           lastBookingFailureMessage = result.exito ? null : 'Ese horario ya no tiene cupo disponible';
         }
+        if (toolName === 'enviar_catalogo' && result.exito && !result.ya_enviado) {
+          sessionUpdates.catalogo_enviado = true;
+          session.catalogo_enviado = true;
+          shouldSendCatalogPdf = true;
+        }
 
         messages.push({
           role: 'tool',
@@ -864,7 +957,7 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
       sessionsModule.updateSession(phone, { escalated_to_human: true, resolved_by_agent: false });
     }
 
-    return { reply, sessionUpdates };
+    return { reply, sessionUpdates, sendCatalogPdf: shouldSendCatalogPdf };
   }
 
   // Safety fallback
