@@ -11,6 +11,11 @@
 const OpenAI = require('openai');
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://innoviacdmxaiagent.up.railway.app').replace(/\/$/, '');
 const CATALOG_PDF_URL = `${PUBLIC_BASE_URL}/catalogo-innovia.pdf`;
+
+// Marca que separa el mensaje de "déjame revisar" del mensaje con la oferta real,
+// para que el webhook las mande como dos mensajes de WhatsApp con una pausa real
+// entre ellos (ver regla 6b — escasez de fin de semana).
+const PAUSE_MARKER = '[[PAUSA]]';
 const {
   getBusinessInfo,
   getBusinessHours,
@@ -287,8 +292,12 @@ Hoy es ${today}.
 6b. **Sábados y domingos — alta demanda:** los fines de semana son los días más solicitados, así que la disponibilidad se presenta distinto (esto aplica tanto para agendar como para reagendar/cambiar de horario a un sábado o domingo):
    - Si la clienta pide un sábado/domingo pero no ha dicho a qué hora, pregúntale primero algo como "¿como a qué hora te gustaría venir?" antes de buscar disponibilidad.
    - En cuanto tengas una hora de referencia (aunque sea aproximada, ej. "en la tarde"), llama a \`buscar_slots_disponibles\` para ese día normalmente — la disponibilidad real sigue siendo la misma, solo cambia cómo se presenta.
-   - **Nunca muestres la lista completa de horarios de ese día.** En vez de eso: primero manda una frase breve de que hay mucha demanda y que vas a revisar, ej. "Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...". Luego, en el mismo turno, ofrece **solo un horario**: el disponible más cercano a la hora que pidió, con un tono de que hiciste un esfuerzo especial por ella, ej. "¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio a las [hora] 🤍".
-   - **Si le dices ese horario y no le funciona, NO ofrezcas otro de inmediato.** Espera a que ella pida explícitamente otra opción (ej. "¿no tienes otra hora?", "necesito otro horario"). Solo entonces repite el patrón de espera ("Déjame ver qué más puedo mover...") y, después de esa pausa, ofrece el siguiente horario disponible más cercano — uno a la vez, nunca varias opciones de golpe, y nunca lo dés al instante.
+   - **Nunca muestres la lista completa de horarios de ese día.** En vez de eso, tu respuesta debe tener DOS partes separadas por el marcador \`${PAUSE_MARKER}\` (literal, tal cual) — esto hace que lleguen como dos mensajes de WhatsApp con una pausa real entre ellos, para que se sienta como que de verdad estás revisando:
+     - **Parte 1:** una frase breve de que hay mucha demanda y que vas a revisar, ej. "Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...".
+     - **Parte 2:** ofrece **solo un horario**: el disponible más cercano a la hora que pidió, con un tono de que hiciste un esfuerzo especial por ella, ej. "¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio a las [hora] 🤍". **Agrega siempre** que será importante que lo confirme y asista, ya que hiciste espacio especialmente para ella — algo como "Será importante que lo confirmes y asistas, ¡nos encantará recibirte! 🤍".
+     - Ejemplo completo: \`Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...${PAUSE_MARKER}¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio a las 5:00 pm 🤍 Será importante que lo confirmes y asistas, ¡nos encantará recibirte!\`
+     - Usa este marcador SOLO para este patrón de espera de fin de semana — en cualquier otra respuesta normal, nunca lo incluyas.
+   - **Si le dices ese horario y no le funciona, NO ofrezcas otro de inmediato.** Espera a que ella pida explícitamente otra opción (ej. "¿no tienes otra hora?", "necesito otro horario"). Solo entonces repite el mismo patrón de dos partes con \`${PAUSE_MARKER}\` ("Déjame ver qué más puedo mover..." + el siguiente horario disponible más cercano) — uno a la vez, nunca varias opciones de golpe, y nunca lo dés al instante.
    - Si no hay NINGÚN horario disponible ese día, o la clienta te dice que solo puede a una hora específica y esa hora ya está ocupada (no hay cupo real para ella aunque haya otros horarios libres): no la mandes a otro día por tu cuenta — sigue la regla 6c (lista de espera).
 6c. **Lista de espera (solo sábados y domingos):** cuando se dé el caso de arriba (sin cupo ese día, o solo puede a una hora ya ocupada), ofrécele anotarse en la lista de espera: "¿Quieres que te anote en la lista de espera para el [día]? Si se libera un lugar, te contactamos enseguida 🤍". **Solo si la clienta confirma que sí quiere**, llama a \`agregar_lista_espera\` con la fecha (y la hora si la mencionó). Nunca la anotes sin que ella lo acepte explícitamente primero. Después de anotarla, confirma que quedó registrada y que el equipo la contactará si se libera algo — no prometas que sí habrá espacio.
 7. **Para consultar cita existente:** Si la clienta pregunta por su cita ("¿tengo una cita?", "¿cuándo es mi cita?", "¿me puedes dar mis datos de cita?") y la "Cita agendada (ID en calendario)" es "Ninguna", sigue este flujo de búsqueda en orden:
@@ -967,4 +976,4 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
   };
 }
 
-module.exports = { runAgent };
+module.exports = { runAgent, PAUSE_MARKER };

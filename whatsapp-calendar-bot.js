@@ -2692,7 +2692,7 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
     // ── FIN TIPO DE CITA ──────────────────────────────────────────────────────
 
     // STEP 3: Run conversational agent (handles all intents + calendar tools)
-    const { runAgent } = require('./bot/agent');
+    const { runAgent, PAUSE_MARKER } = require('./bot/agent');
 
     // Guard against concurrent processing for the same phone number.
     // If two messages arrive within seconds of each other (e.g. "A las 11" + "☺️"),
@@ -2726,10 +2726,26 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       appointmentCreationLocks.delete(cleanPhone);
     }
 
-    // Send the agent's natural-language reply
+    // Send the agent's natural-language reply.
+    // A reply containing PAUSE_MARKER (weekend scarcity flow) is split into two
+    // WhatsApp messages with a real pause + typing indicator in between, so it
+    // actually feels like the bot is "checking" instead of answering instantly.
     if (agentResult.reply) {
-      await sendWhatsAppMessage(cleanPhone, agentResult.reply);
-      sessions.addToHistory(cleanPhone, 'assistant', agentResult.reply);
+      if (agentResult.reply.includes(PAUSE_MARKER)) {
+        const parts = agentResult.reply.split(PAUSE_MARKER).map(p => p.trim()).filter(Boolean);
+        for (let i = 0; i < parts.length; i++) {
+          await sendWhatsAppMessage(cleanPhone, parts[i]);
+          sessions.addToHistory(cleanPhone, 'assistant', parts[i]);
+          if (i < parts.length - 1) {
+            await sendTypingIndicator(cleanPhone, 'typing_on');
+            const pauseMs = 50000 + Math.floor(Math.random() * 20000); // ~50-70s
+            await new Promise(resolve => setTimeout(resolve, pauseMs));
+          }
+        }
+      } else {
+        await sendWhatsAppMessage(cleanPhone, agentResult.reply);
+        sessions.addToHistory(cleanPhone, 'assistant', agentResult.reply);
+      }
     }
 
     // Send the catalog PDF as a document attachment, if the agent requested it this turn
