@@ -44,9 +44,20 @@ async function init() {
     const result = await pool.query('SELECT data FROM bot_config WHERE id = 1');
 
     if (result.rows.length > 0) {
+      // Campos que se editan siempre en business_config.json (git) y nunca desde
+      // el panel /api/config — se preservan del archivo local, para que una copia
+      // vieja sembrada en DB en un deploy anterior no pise ediciones nuevas
+      // (ej. FAQs o promociones agregadas al archivo después del primer seed).
+      const jsonManagedKeys = ['faqs', 'asuetos', 'promociones'];
+      const localOverrides = {};
+      for (const key of jsonManagedKeys) {
+        if (businessConfig[key] !== undefined) localOverrides[key] = businessConfig[key];
+      }
+
       // Mutate in-place so existing references stay valid
       Object.assign(businessConfig, result.rows[0].data);
-      console.log('✅ Business config cargado desde DB');
+      Object.assign(businessConfig, localOverrides);
+      console.log('✅ Business config cargado desde DB (faqs/asuetos/promociones tomados del archivo local)');
     } else {
       // First deploy — seed the DB from the local JSON file
       await pool.query(
