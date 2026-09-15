@@ -41,6 +41,16 @@
     "lunes": "Cerrado"
   },
 
+  "promociones": [
+    {
+      "nombre": "Venta Nocturna",
+      "inicio": "2026-09-17",
+      "fin": "2026-09-27",
+      "descuento_maximo": 50,
+      "descripcion": "Descuentos de hasta 50% en catálogo. A pesar del nombre, las citas son en el horario normal de tienda, no hay citas nocturnas."
+    }
+  ],
+
   "catalogo": {
     "nombre": "Colección 2026",
     "link": "https://drive.google.com/file/d/1r6-KMjl1aKhY0dTGn9k2m0Ha3xXfeWt_/view?usp=drive_link"
@@ -128,6 +138,16 @@
       "pregunta": "¿Cuáles son las formas de pago?",
       "respuesta": "Aceptamos todas las tarjetas de débito/crédito, y transferencia. También se puede pagar a contado o a meses en tienda. 💳",
       "categoria": "Precios y Pagos"
+    },
+    {
+      "pregunta": "¿Qué es la Venta Nocturna?",
+      "respuesta": "Del 17 al 27 de septiembre tenemos nuestra promoción especial Venta Nocturna, con descuentos de hasta 50% en catálogo ✨ ¿Quieres que te busque un horario disponible para tu cita? 👰‍♀️",
+      "categoria": "Promociones"
+    },
+    {
+      "pregunta": "¿Tienen citas nocturnas o después de las 8pm por la Venta Nocturna?",
+      "respuesta": "Por el momento no tenemos citas disponibles después de las 8pm. Te puedo ofrecer los horarios que sí tenemos dentro de nuestro horario de atención 💕",
+      "categoria": "Promociones"
     },
     {
       "pregunta": "¿Tienen descuentos o promociones?",

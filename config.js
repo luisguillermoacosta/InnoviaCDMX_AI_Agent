@@ -215,6 +215,13 @@ function getHolidays() {
 }
 
 /**
+ * Get promotions list
+ */
+function getPromotions() {
+  return config.promociones || [];
+}
+
+/**
  * Get conversation flow configuration
  */
 function getConversationFlow() {
@@ -432,6 +439,9 @@ module.exports = {
 
   // Holidays
   getHolidays,
+
+  // Promotions
+  getPromotions,
 
   // Conversation flow
   getConversationFlow,
