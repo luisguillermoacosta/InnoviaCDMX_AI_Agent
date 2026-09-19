@@ -210,7 +210,7 @@ const TOOLS = [
       name: 'reagendar_cita',
       description:
         'Mueve una cita existente a una nueva fecha y hora en Google Calendar. ' +
-        'Cada clienta solo puede reagendar UNA vez — si "Veces que ya reagendó su cita" ya es 1 o más, NO llames a esta herramienta, ver regla 8b.',
+        'Cada clienta solo puede cambiar de DÍA una vez — si "Veces que ya reagendó su cita" ya es 1 o más y la nueva fecha es un día distinto al agendado, NO llames a esta herramienta, ver regla 8b. Un cambio de hora dentro del mismo día no tiene este límite.',
       parameters: {
         type: 'object',
         properties: {
@@ -329,10 +329,10 @@ Hoy es ${today}.
      - **Si el día en cuestión es sábado o domingo, o cae dentro del rango de una promoción de alta demanda:** sigue la regla 6c (lista de espera) en vez de escalar — ofrécele anotarse en lista de espera para ese día.
      - **Si quiere quedarse en el mismo día, es entre semana, y no cae dentro de una promoción de alta demanda** (busca otra hora ese mismo día y no hay cupo a esa hora): **NUNCA le digas que no hay ese horario ni le ofrezcas otras horas de ese mismo día por tu cuenta.** Llama de inmediato a \`escalar_a_humano\` para que una asesora la contacte y le ayude directamente.
      - **Si está dispuesta a cambiar de día:** sí puedes buscar y ofrecerle horarios disponibles en otro día con \`buscar_slots_disponibles\`, igual que en el flujo normal de agendar (aplica la regla 6b si ese otro día también es sábado/domingo o cae dentro de una promoción).
-8b. **REGLA ABSOLUTA — máximo una reagendada por clienta.** Muchas novias reagendan su cita 2 o más veces y al final no llegan, quitándole el espacio a otras — por eso cada clienta solo tiene derecho a reagendar UNA vez.
-   - Revisa "Veces que ya reagendó su cita" en el contexto. Si es 0, puedes reagendar normalmente (regla 8).
-   - **Si ya es 1 o más, NO llames a \`reagendar_cita\` de nuevo bajo ninguna circunstancia** — ni le ofrezcas horarios tú misma. Explícale con amabilidad que ya usó su única reagendada y por eso ya no es posible mover la cita otra vez, y llama de inmediato a \`escalar_a_humano\` para que una asesora vea su caso (la herramienta \`reagendar_cita\` también rechaza la segunda solicitud a nivel de sistema, como respaldo).
-   - **Cuando \`reagendar_cita\` se ejecute con éxito Y sea la primera vez que esta clienta reagenda** (es decir, "Veces que ya reagendó su cita" era 0 antes de esta reagendada), después de confirmar los nuevos detalles de la cita agrega siempre un mensaje como este, adaptado con su nombre: "Listo [nombre], te pudimos reagendar con éxito, pero si no pudieras llegar a la siguiente cita ya no tendríamos oportunidad de reagendar dado la alta demanda que tenemos por las promociones del mes, esto con la finalidad de darle espacio y oportunidad a todas nuestras novias ❤️". Si no hay promoción vigente en ese momento, igual usa la misma idea (alta demanda) sin mencionar promociones inexistentes.
+8b. **REGLA ABSOLUTA — máximo un cambio de DÍA por clienta.** Muchas novias cambiaban el día de su cita 2 o más veces y al final no llegaban, quitándole el espacio a otras. **Esto aplica SOLO cuando la nueva fecha es un día distinto al que tiene agendado.** Un cambio de horario dentro del MISMO día (la clienta sigue queriendo el mismo día, solo otra hora) no cuenta para este límite — ese caso sigue la regla 8 normal (incluye escalar a una asesora si no hay cupo a esa hora).
+   - Revisa "Veces que ya reagendó su cita" en el contexto. Si es 0, o si la clienta solo quiere cambiar la hora dentro de su mismo día ya agendado, puedes reagendar normalmente (regla 8).
+   - **Si ya es 1 o más Y la clienta pide un día distinto al que tiene agendado, NO llames a \`reagendar_cita\` de nuevo bajo ninguna circunstancia** — ni le ofrezcas otro día tú misma. Explícale con amabilidad que ya usó su única oportunidad de cambiar de día y por eso ya no es posible moverla a otro día, y llama de inmediato a \`escalar_a_humano\` para que una asesora vea su caso (la herramienta \`reagendar_cita\` también rechaza la segunda solicitud de cambio de día a nivel de sistema, como respaldo).
+   - **Cuando \`reagendar_cita\` se ejecute con éxito cambiando de día Y sea la primera vez que esta clienta cambia de día** (es decir, "Veces que ya reagendó su cita" era 0 antes de este cambio), después de confirmar los nuevos detalles de la cita agrega siempre un mensaje como este, adaptado con su nombre: "Listo [nombre], te pudimos reagendar con éxito, pero si no pudieras llegar a la siguiente cita ya no tendríamos oportunidad de reagendar dado la alta demanda que tenemos por las promociones del mes, esto con la finalidad de darle espacio y oportunidad a todas nuestras novias ❤️". Si no hay promoción vigente en ese momento, igual usa la misma idea (alta demanda) sin mencionar promociones inexistentes. **No agregues este mensaje cuando solo cambió la hora dentro del mismo día.**
 9. **Catálogo — regla absoluta:** En cualquier respuesta que trate sobre la boutique, los vestidos, modelos, precios, información general del negocio, o cuando la clienta pida "información" sin especificar, llama a la herramienta \`enviar_catalogo\` en ese mismo turno (te manda el catálogo como PDF adjunto). Ejemplos donde DEBES llamarla: "quiero información", "¿qué ofrecen?", "¿cómo son sus vestidos?", "¿cuánto cuestan?", "¿dónde están?", "quiero ver opciones". **En el mismo mensaje de texto, además del PDF, menciona que también puede descargarlo directo desde este link si lo prefiere:** ${CATALOG_PDF_URL} (compártelo como URL plana, nunca en formato [texto](url) — ver regla 13c). Excepción: si "Catálogo PDF ya enviado en esta conversación" es "Sí", no lo vuelvas a enviar ni a repetir el link — solo menciona que ya se lo compartiste arriba si hace falta.
 10. **Tono:** cálido, emocionante, personal. Como una amiga experta en bodas. Usa emojis con moderación (👰‍♀️ ✨ 💐 🤍).
 11. **Precios:** Cuando pregunten cuánto cuestan los vestidos —**ya sea en general o sobre un modelo/estilo específico que mencionen o describan** (por nombre, número, foto, "el de encaje con escote corazón", etc.)— responde siempre con esta misma idea: "nuestros vestidos, ya con promoción, inician en $${(pricing.techo_promocion || 30000).toLocaleString()} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales". Después invita a verlo en showroom: ahí las asesoras confirman el precio exacto y pueden dar sorpresas o descuentos exclusivos según el modelo y la fecha de compra.
@@ -614,18 +614,21 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const { event_id, nueva_hora_inicio } = toolArgs;
       console.log(`🔧 Agent tool: reagendar_cita(${event_id} → ${nueva_hora_inicio})`);
 
-      // ── REGLA DE NEGOCIO: máximo una reagendada por clienta ────────────
-      // Varias novias reagendaban 2+ veces y al final no llegaban, quitándole
-      // el cupo a otras. A partir de la primera reagendada exitosa, cualquier
-      // solicitud adicional de cambiar la fecha se bloquea aquí (a nivel de
-      // código, no solo de instrucción al modelo) y se manda a un humano.
+      // ── REGLA DE NEGOCIO: máximo una reagendada de DÍA por clienta ─────
+      // Varias novias cambiaban el día de su cita 2+ veces y al final no
+      // llegaban, quitándole el cupo a otras. El límite aplica solo cuando
+      // cambia el día — un cambio de horario dentro del mismo día ya se
+      // maneja con la regla 8 (incluye escalar a una asesora cuando no hay
+      // cupo a esa hora) y no cuenta para este límite.
+      const nuevaFechaStr = nueva_hora_inicio.split('T')[0];
+      const esCambioDeDia = !session.fecha_cita || nuevaFechaStr !== session.fecha_cita;
       const vecesReagendada = session.veces_reagendada || 0;
-      if (vecesReagendada >= 1) {
-        console.warn(`⚠️  reagendar_cita bloqueada: la clienta ya reagendó ${vecesReagendada} vez/veces antes`);
+      if (esCambioDeDia && vecesReagendada >= 1) {
+        console.warn(`⚠️  reagendar_cita bloqueada: la clienta ya cambió de día ${vecesReagendada} vez/veces antes`);
         return {
           exito: false,
           limite_alcanzado: true,
-          error: 'Esta clienta ya reagendó su cita una vez antes y ya se le explicó que no habría una segunda oportunidad. NO llames a reagendar_cita de nuevo ni le ofrezcas otro horario tú misma. Explícale con amabilidad que ya utilizó su única reagendada y por eso no es posible mover la cita otra vez, y llama de inmediato a escalar_a_humano para que una asesora vea su caso directamente.'
+          error: 'Esta clienta ya cambió el día de su cita una vez antes y ya se le explicó que no habría una segunda oportunidad de cambiar de día. NO llames a reagendar_cita de nuevo para otro día ni le ofrezcas otro día tú misma. Explícale con amabilidad que ya utilizó su única oportunidad de cambiar de día y por eso no es posible moverla a otro día otra vez, y llama de inmediato a escalar_a_humano para que una asesora vea su caso directamente. (Si en cambio solo quiere cambiar la hora dentro de su mismo día ya agendado, eso sigue permitido — no es este caso.)'
         };
       }
 
@@ -928,10 +931,15 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           sessionUpdates.fecha_cita = null;
         }
         if (toolName === 'reagendar_cita' && result.exito) {
+          const nuevaFechaCita = toolArgs.nueva_hora_inicio.split('T')[0];
+          // Solo cuenta para el límite si cambió el DÍA — un cambio de hora
+          // dentro del mismo día no consume la única reagendada permitida.
+          if (session.fecha_cita && nuevaFechaCita !== session.fecha_cita) {
+            sessionUpdates.veces_reagendada = (session.veces_reagendada || 0) + 1;
+            session.veces_reagendada = sessionUpdates.veces_reagendada;
+          }
           sessionUpdates.calendar_event_id = result.event_id;
-          sessionUpdates.fecha_cita = toolArgs.nueva_hora_inicio.split('T')[0];
-          sessionUpdates.veces_reagendada = (session.veces_reagendada || 0) + 1;
-          session.veces_reagendada = sessionUpdates.veces_reagendada;
+          sessionUpdates.fecha_cita = nuevaFechaCita;
         }
         if (toolName === 'confirmar_cita' || toolName === 'reagendar_cita') {
           // No pisar la respuesta cuando el fallo es por límite de reagendada
