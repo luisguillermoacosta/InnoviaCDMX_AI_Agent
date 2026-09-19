@@ -52,7 +52,8 @@ async function init() {
  *   ultima_actividad: Date (ISO string),
  *   slots_disponibles: Array | null,
  *   fecha_cita_solicitada: string | null,
- *   bot_paused_until: string | null
+ *   bot_paused_until: string | null,
+ *   veces_reagendada: number
  * }
  */
 
@@ -69,7 +70,8 @@ function getSession(phone) {
       ultima_actividad: new Date().toISOString(),
       slots_disponibles: null,
       fecha_cita_solicitada: null,
-      bot_paused_until: null
+      bot_paused_until: null,
+      veces_reagendada: 0
     };
     sessions.set(cleanPhone, newSession);
     console.log(`📝 Nueva sesión creada para: ${cleanPhone}`);
@@ -104,7 +106,7 @@ function updateSession(phone, data, options = {}) {
     ? previousActivity
     : new Date().toISOString();
 
-  const importantChanges = ['etapa', 'nombre_novia', 'fecha_boda', 'fecha_cita', 'calendar_event_id', 'escalated_to_human', 'resolved_by_agent'];
+  const importantChanges = ['etapa', 'nombre_novia', 'fecha_boda', 'fecha_cita', 'calendar_event_id', 'escalated_to_human', 'resolved_by_agent', 'veces_reagendada'];
   const hasImportantChange = importantChanges.some(key => Object.prototype.hasOwnProperty.call(data, key));
 
   if (hasImportantChange) {
