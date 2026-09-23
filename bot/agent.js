@@ -16,6 +16,101 @@ const CATALOG_PDF_URL = `${PUBLIC_BASE_URL}/catalogo-innovia.pdf`;
 // para que el webhook las mande como dos mensajes de WhatsApp con una pausa real
 // entre ellos (ver regla 6b — escasez de fin de semana).
 const PAUSE_MARKER = '[[PAUSA]]';
+
+// ---------------------------------------------------------------------------
+// Validación de la oferta de "alta demanda" (regla 6b)
+// ---------------------------------------------------------------------------
+// En el patrón de escasez el modelo escribe la hora a mano ("te logré conseguir
+// un espacio a las 5:00 pm"), y se detectó que a veces la inventa o la toma de
+// otro día. Aquí se verifica, a nivel de código, que cada hora ofrecida después
+// del PAUSE_MARKER exista como evento azul en lo que devolvió
+// buscar_slots_disponibles EN ESTE TURNO, para el día que se menciona.
+// Mismo criterio único de disponibilidad: libre ⇔ existe su evento azul.
+const WEEKDAYS_ES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+  'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+function normalizeEs(text) {
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Devuelve [{ index, weekday?, day?, month? }] con las menciones de día en el texto.
+function findDayMentions(text) {
+  const norm = normalizeEs(text);
+  const mentions = [];
+  WEEKDAYS_ES.forEach((name, weekday) => {
+    const re = new RegExp(`\\b${normalizeEs(name)}\\b`, 'g');
+    let m;
+    while ((m = re.exec(norm))) mentions.push({ index: m.index, weekday });
+  });
+  const dateRe = new RegExp(`\\b(\\d{1,2})\\s+de\\s+(${MONTHS_ES.join('|')})\\b`, 'g');
+  let m;
+  while ((m = dateRe.exec(norm))) {
+    mentions.push({ index: m.index, day: parseInt(m[1], 10), month: MONTHS_ES.indexOf(m[2]) + 1 });
+  }
+  return mentions.sort((a, b) => a.index - b.index);
+}
+
+// Devuelve [{ index, hhmm, raw }] con las horas mencionadas ("5:00 pm", "11 a.m.", "17:00").
+function findTimeMentions(text) {
+  const re = /\b(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?)?(?=[\s,.;!?🤍)]|$)/gi;
+  const times = [];
+  let m;
+  while ((m = re.exec(text))) {
+    const [raw, hStr, minStr, ampm] = m;
+    if (!minStr && !ampm) continue; // "27 de septiembre" no es una hora
+    let h = parseInt(hStr, 10);
+    const min = minStr ? parseInt(minStr, 10) : 0;
+    if (h > 23 || min > 59) continue;
+    const suffix = ampm ? ampm.toLowerCase().replace(/[^ap]/g, '') : '';
+    if (suffix === 'p' && h < 12) h += 12;
+    else if (suffix === 'a' && h === 12) h = 0;
+    else if (!suffix && h >= 1 && h <= 8) h += 12; // "a las 5:00" en horario de showroom = tarde
+    times.push({ index: m.index, hhmm: `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`, raw: raw.trim() });
+  }
+  return times;
+}
+
+function dateMatchesMention(dateStr, mention) {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  if (mention.weekday !== undefined) {
+    return new Date(Date.UTC(y, mo - 1, d)).getUTCDay() === mention.weekday;
+  }
+  return d === mention.day && mo === mention.month;
+}
+
+/**
+ * Revisa las horas ofrecidas después del PAUSE_MARKER.
+ * @param {string} reply
+ * @param {Map<string, Set<string>>} slotsByDate  "YYYY-MM-DD" → Set("HH:MM") consultados en este turno
+ * @returns {{ ok: boolean, problems: string[] }}
+ */
+function validateHighDemandOffer(reply, slotsByDate) {
+  const parts = reply.split(PAUSE_MARKER);
+  if (parts.length < 2) return { ok: true, problems: [] };
+
+  const problems = [];
+  // Último día mencionado antes de la oferta (ej. "Para el sábado, déjame revisar...").
+  let carriedDay = findDayMentions(parts[0]).pop() || null;
+
+  for (const part of parts.slice(1)) {
+    const days = findDayMentions(part);
+    for (const t of findTimeMentions(part)) {
+      const dayHere = days.filter(d => d.index < t.index).pop() || days[0] || carriedDay;
+      const candidateDates = [...slotsByDate.keys()].filter(ds => !dayHere || dateMatchesMention(ds, dayHere));
+      const ok = candidateDates.some(ds => slotsByDate.get(ds).has(t.hhmm));
+      if (!ok) {
+        const dayLabel = dayHere
+          ? (dayHere.weekday !== undefined ? WEEKDAYS_ES[dayHere.weekday] : `${dayHere.day} de ${MONTHS_ES[dayHere.month - 1]}`)
+          : 'ese día';
+        problems.push(`"${t.raw}" para ${dayLabel}`);
+      }
+    }
+    if (days.length) carriedDay = days[days.length - 1];
+  }
+  return { ok: problems.length === 0, problems };
+}
+
 const {
   getBusinessInfo,
   getBusinessHours,
@@ -310,7 +405,8 @@ Hoy es ${today}.
    - **Nunca muestres la lista completa de horarios de ese día.** En vez de eso, tu respuesta debe tener DOS partes separadas por el marcador \`${PAUSE_MARKER}\` (literal, tal cual) — esto hace que lleguen como dos mensajes de WhatsApp con una pausa real entre ellos, para que se sienta como que de verdad estás revisando:
      - **Parte 1:** una frase breve de que hay mucha demanda y que vas a revisar. Si es por fin de semana: "Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...". Si es por una promoción vigente, menciona la promoción en vez del fin de semana, ej. "Uy, con la Venta Nocturna estamos recibiendo muchísimas novias estos días 😅 Déjame checar un momento...".
      - **Parte 2:** ofrece **solo un horario**: el disponible más cercano a la hora que pidió, con un tono de que hiciste un esfuerzo especial por ella, ej. "¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio a las [hora] 🤍". **Agrega siempre** que será importante que lo confirme y asista, ya que hiciste espacio especialmente para ella — algo como "Será importante que lo confirmes y asistas, ¡nos encantará recibirte! 🤍".
-     - Ejemplo completo: \`Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...${PAUSE_MARKER}¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio a las 5:00 pm 🤍 Será importante que lo confirmes y asistas, ¡nos encantará recibirte!\`
+     - **REGLA ABSOLUTA — la hora que ofreces aquí DEBE salir de \`buscar_slots_disponibles\` para ESA fecha exacta, consultada en este mismo turno.** "Moví algunas cosas" es solo la forma de presentarlo: nunca "hagas espacio" de verdad ni inventes una hora, ni uses una hora que viste para otro día. Si la hora que pidió no está en la lista, ofrece la disponible más cercana de esa lista; si la lista de ese día está vacía, sigue la regla 6c. En este patrón ofrece un solo día (no mezcles, por ejemplo, domingo y sábado en la misma respuesta). El sistema valida esto y rechaza cualquier hora que no esté en la lista.
+     - Ejemplo completo (la hora es ilustrativa — usa siempre una de la lista real): \`Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...${PAUSE_MARKER}¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio el sábado 26 a las [hora de la lista] 🤍 Será importante que lo confirmes y asistas, ¡nos encantará recibirte!\`
      - Usa este marcador SOLO para este patrón de espera de fin de semana o de promoción — en cualquier otra respuesta normal, nunca lo incluyas.
    - **Si la clienta pregunta explícitamente por un horario fuera del horario de atención** (por ejemplo, después de las 8pm entre semana/sábado, o después de las 6pm domingo — incluso durante la Venta Nocturna, a pesar del nombre): dile que no tienes citas disponibles después de esa hora. Nunca inventes ni ofrezcas un horario fuera del horario de atención normal, ninguna promoción lo cambia.
    - **Si le dices ese horario y no le funciona, NO ofrezcas otro de inmediato.** Espera a que ella pida explícitamente otra opción (ej. "¿no tienes otra hora?", "necesito otro horario"). Solo entonces repite el mismo patrón de dos partes con \`${PAUSE_MARKER}\` ("Déjame ver qué más puedo mover..." + el siguiente horario disponible más cercano) — uno a la vez, nunca varias opciones de golpe, y nunca lo dés al instante.
@@ -822,7 +918,13 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
   ];
 
   const sessionUpdates = {};
-  const MAX_ITERATIONS = 5;
+  const MAX_ITERATIONS = 7;
+
+  // Horarios (eventos azules) consultados con buscar_slots_disponibles en ESTE
+  // turno, por fecha — se usan para validar la oferta de alta demanda (6b).
+  const slotsConsultadosEnTurno = new Map();
+  let correccionesOferta = 0;
+  const MAX_CORRECCIONES_OFERTA = 2;
 
   // Tracks the outcome of the LAST confirmar_cita/reagendar_cita call this turn.
   // The model sees the tool's exito:false result but can still hallucinate a
@@ -909,6 +1011,9 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           sessionUpdates.slots_disponibles = merged;
           sessionUpdates.fecha_cita_solicitada = toolArgs.fecha;
           session.slots_disponibles = merged;
+          const horas = slotsConsultadosEnTurno.get(toolArgs.fecha) || new Set();
+          result.slots_disponibles.forEach(s => horas.add((s.start || '').slice(11, 16)));
+          slotsConsultadosEnTurno.set(toolArgs.fecha, horas);
         }
         if (toolName === 'confirmar_cita' && result.exito) {
           sessionUpdates.calendar_event_id = result.event_id;
@@ -973,6 +1078,36 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
     // texto roto con el link duplicado. Por si el modelo lo genera pese a la
     // instrucción del prompt, lo convertimos a URL plana.
     let reply = (choice.message.content || '').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$2');
+
+    // ---- High-demand offer safety net (regla 6b) --------------------------
+    // En el patrón "¡Listo! Moví algunas cosas... te conseguí un espacio a las X"
+    // el modelo escribe la hora a mano y llegó a ofrecer horarios sin evento
+    // azul (inventados, o tomados de otro día). Cada hora ofrecida tras el
+    // PAUSE_MARKER debe existir en buscar_slots_disponibles de este turno para
+    // ese día; si no, se le pide corregir y, como último recurso, se manda una
+    // respuesta honesta en vez de prometer un espacio que no existe.
+    if (reply.includes(PAUSE_MARKER)) {
+      const { ok, problems } = validateHighDemandOffer(reply, slotsConsultadosEnTurno);
+      if (!ok) {
+        console.warn(`⚠️  [OFERTA ALTA DEMANDA] Horario(s) sin evento azul: ${problems.join(', ')}`);
+        if (correccionesOferta < MAX_CORRECCIONES_OFERTA && i < MAX_ITERATIONS - 1) {
+          correccionesOferta++;
+          messages.push({ role: 'assistant', content: choice.message.content || '' });
+          messages.push({
+            role: 'system',
+            content:
+              `CORRECCIÓN INTERNA (la clienta no ha visto tu respuesta anterior): ofreciste ${problems.join(', ')}, ` +
+              'pero ese horario NO está entre los horarios disponibles que devolvió buscar_slots_disponibles en este turno para ese día. ' +
+              'Nunca ofrezcas un horario que no hayas visto en esa lista para esa fecha exacta. ' +
+              'Llama a buscar_slots_disponibles para la fecha exacta que pidió la clienta (si no lo hiciste ya) y vuelve a redactar tu respuesta completa ' +
+              'ofreciendo SOLO un horario que aparezca en la lista de ESE día, y menciona un solo día en la oferta. ' +
+              'Si ese día no tiene ningún horario que le funcione, no inventes uno: sigue la regla 6c (lista de espera).'
+          });
+          continue;
+        }
+        reply = 'Uy, para ese día ya no me quedan espacios disponibles 😔 ¿Quieres que te anote en la lista de espera? Si se libera un lugar, te contactamos enseguida 🤍';
+      }
+    }
 
     // ---- Booking-failure safety net ---------------------------------------
     // If the last confirmar_cita/reagendar_cita call this turn was blocked for
