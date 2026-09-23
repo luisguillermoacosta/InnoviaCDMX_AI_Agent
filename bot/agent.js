@@ -82,14 +82,15 @@ function dateMatchesMention(dateStr, mention) {
 /**
  * Revisa las horas ofrecidas después del PAUSE_MARKER.
  * @param {string} reply
- * @param {Map<string, Set<string>>} slotsByDate  "YYYY-MM-DD" → Set("HH:MM") consultados en este turno
- * @returns {{ ok: boolean, problems: string[] }}
+ * @param {Map<string, Map<string, string>>} slotsByDate  "YYYY-MM-DD" → Map("HH:MM" → inicio ISO) consultados en este turno
+ * @returns {{ ok: boolean, problems: string[], ofertas: string[] }}
  */
 function validateHighDemandOffer(reply, slotsByDate) {
   const parts = reply.split(PAUSE_MARKER);
   if (parts.length < 2) return { ok: true, problems: [] };
 
   const problems = [];
+  const ofertas = []; // horarios válidos ofrecidos: inicio ISO del evento azul
   // Último día mencionado antes de la oferta (ej. "Para el sábado, déjame revisar...").
   let carriedDay = findDayMentions(parts[0]).pop() || null;
 
@@ -98,8 +99,9 @@ function validateHighDemandOffer(reply, slotsByDate) {
     for (const t of findTimeMentions(part)) {
       const dayHere = days.filter(d => d.index < t.index).pop() || days[0] || carriedDay;
       const candidateDates = [...slotsByDate.keys()].filter(ds => !dayHere || dateMatchesMention(ds, dayHere));
-      const ok = candidateDates.some(ds => slotsByDate.get(ds).has(t.hhmm));
-      if (!ok) {
+      const fechaOk = candidateDates.find(ds => slotsByDate.get(ds).has(t.hhmm));
+      if (fechaOk) ofertas.push(slotsByDate.get(fechaOk).get(t.hhmm));
+      else {
         const dayLabel = dayHere
           ? (dayHere.weekday !== undefined ? WEEKDAYS_ES[dayHere.weekday] : `${dayHere.day} de ${MONTHS_ES[dayHere.month - 1]}`)
           : 'ese día';
@@ -108,7 +110,7 @@ function validateHighDemandOffer(reply, slotsByDate) {
     }
     if (days.length) carriedDay = days[days.length - 1];
   }
-  return { ok: problems.length === 0, problems };
+  return { ok: problems.length === 0, problems, ofertas };
 }
 
 const {
@@ -378,6 +380,7 @@ ${promoInfo}
 - **Fecha de boda:** ${session.fecha_boda || 'No proporcionada aún'}
 - **Cita agendada (ID en calendario):** ${session.calendar_event_id || 'Ninguna'}
 - **Veces que ya reagendó su cita:** ${session.veces_reagendada || 0}
+- **Horario ofrecido pendiente de que la clienta acepte:** ${session.oferta_pendiente || 'Ninguno'}
 - **Catálogo PDF ya enviado en esta conversación:** ${session.catalogo_enviado ? 'Sí' : 'No'}
 ${slotsInfo}
 
@@ -409,6 +412,7 @@ Hoy es ${today}.
      - Ejemplo completo (la hora es ilustrativa — usa siempre una de la lista real): \`Uy, los sábados se llenan súper rápido 😅 Déjame checar un momento...${PAUSE_MARKER}¡Listo! Moví algunas cosas para poder atenderte — te logré conseguir un espacio el sábado 26 a las [hora de la lista] 🤍 Será importante que lo confirmes y asistas, ¡nos encantará recibirte!\`
      - Usa este marcador SOLO para este patrón de espera de fin de semana o de promoción — en cualquier otra respuesta normal, nunca lo incluyas.
    - **Si la clienta pregunta explícitamente por un horario fuera del horario de atención** (por ejemplo, después de las 8pm entre semana/sábado, o después de las 6pm domingo — incluso durante la Venta Nocturna, a pesar del nombre): dile que no tienes citas disponibles después de esa hora. Nunca inventes ni ofrezcas un horario fuera del horario de atención normal, ninguna promoción lo cambia.
+   - **Cuando la clienta acepte el horario que le ofreciste** (ej. "sí", "va", "perfecto", "confirmo asistencia", "ahí nos vemos"), llama EN ESE MISMO TURNO a \`reagendar_cita\` (si ya tiene cita agendada) o a \`confirmar_cita\` (si no tiene) con el "Horario ofrecido pendiente" del contexto, y después confírmale fecha, hora y dirección. **Nunca respondas solo "gracias, te esperamos"** sin haber agendado — si no llamas a la herramienta, la cita NO existe en el calendario.
    - **Si le dices ese horario y no le funciona, NO ofrezcas otro de inmediato.** Espera a que ella pida explícitamente otra opción (ej. "¿no tienes otra hora?", "necesito otro horario"). Solo entonces repite el mismo patrón de dos partes con \`${PAUSE_MARKER}\` ("Déjame ver qué más puedo mover..." + el siguiente horario disponible más cercano) — uno a la vez, nunca varias opciones de golpe, y nunca lo dés al instante.
    - Si no hay NINGÚN horario disponible ese día, o la clienta te dice que solo puede a una hora específica y esa hora ya está ocupada (no hay cupo real para ella aunque haya otros horarios libres): no la mandes a otro día por tu cuenta — sigue la regla 6c (lista de espera).
 6c. **Lista de espera (días de alta demanda: sábados, domingos, o días dentro de una promoción vigente):** cuando se dé el caso de arriba (sin cupo ese día, o solo puede a una hora ya ocupada), ofrécele anotarse en la lista de espera: "¿Quieres que te anote en la lista de espera para el [día]? Si se libera un lugar, te contactamos enseguida 🤍". **Solo si la clienta confirma que sí quiere**, llama a \`agregar_lista_espera\` con la fecha (y la hora si la mencionó). Nunca la anotes sin que ella lo acepte explícitamente primero. Después de anotarla, confirma que quedó registrada y que el equipo la contactará si se libera algo — no prometas que sí habrá espacio.
@@ -924,6 +928,8 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
   // turno, por fecha — se usan para validar la oferta de alta demanda (6b).
   const slotsConsultadosEnTurno = new Map();
   let correccionesOferta = 0;
+  let reservaIntentadaEnTurno = false;
+  let correccionAceptacion = false;
   const MAX_CORRECCIONES_OFERTA = 2;
 
   // Tracks the outcome of the LAST confirmar_cita/reagendar_cita call this turn.
@@ -1011,8 +1017,8 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           sessionUpdates.slots_disponibles = merged;
           sessionUpdates.fecha_cita_solicitada = toolArgs.fecha;
           session.slots_disponibles = merged;
-          const horas = slotsConsultadosEnTurno.get(toolArgs.fecha) || new Set();
-          result.slots_disponibles.forEach(s => horas.add((s.start || '').slice(11, 16)));
+          const horas = slotsConsultadosEnTurno.get(toolArgs.fecha) || new Map();
+          result.slots_disponibles.forEach(s => horas.set((s.start || '').slice(11, 16), s.start));
           slotsConsultadosEnTurno.set(toolArgs.fecha, horas);
         }
         if (toolName === 'confirmar_cita' && result.exito) {
@@ -1045,6 +1051,13 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           }
           sessionUpdates.calendar_event_id = result.event_id;
           sessionUpdates.fecha_cita = nuevaFechaCita;
+        }
+        if (['confirmar_cita', 'reagendar_cita', 'cancelar_cita'].includes(toolName)) {
+          reservaIntentadaEnTurno = true;
+          if (result.exito) {
+            sessionUpdates.oferta_pendiente = null;
+            session.oferta_pendiente = null;
+          }
         }
         if (toolName === 'confirmar_cita' || toolName === 'reagendar_cita') {
           // No pisar la respuesta cuando el fallo es por límite de reagendada
@@ -1087,7 +1100,12 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
     // ese día; si no, se le pide corregir y, como último recurso, se manda una
     // respuesta honesta en vez de prometer un espacio que no existe.
     if (reply.includes(PAUSE_MARKER)) {
-      const { ok, problems } = validateHighDemandOffer(reply, slotsConsultadosEnTurno);
+      const { ok, problems, ofertas } = validateHighDemandOffer(reply, slotsConsultadosEnTurno);
+      if (ok && ofertas.length === 1) {
+        // Se recuerda el horario ofrecido: cuando la clienta diga "sí/confirmo"
+        // en el siguiente mensaje, el modelo debe agendarlo de verdad.
+        sessionUpdates.oferta_pendiente = ofertas[0];
+      }
       if (!ok) {
         console.warn(`⚠️  [OFERTA ALTA DEMANDA] Horario(s) sin evento azul: ${problems.join(', ')}`);
         if (correccionesOferta < MAX_CORRECCIONES_OFERTA && i < MAX_ITERATIONS - 1) {
@@ -1107,6 +1125,34 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
         }
         reply = 'Uy, para ese día ya no me quedan espacios disponibles 😔 ¿Quieres que te anote en la lista de espera? Si se libera un lugar, te contactamos enseguida 🤍';
       }
+    }
+
+    // ---- Accepted-offer safety net ----------------------------------------
+    // Caso real: se le ofreció un horario, la clienta respondió "confirmo
+    // asistencia" y el bot contestó "¡Gracias! Te esperamos" sin llamar a
+    // confirmar_cita/reagendar_cita — la clienta creía tener cita y el
+    // calendario nunca cambió. Si hay una oferta pendiente y la respuesta suena
+    // a cierre/confirmación sin que se haya agendado nada, se le exige hacerlo.
+    const frasesCierre = ['te esperamos', 'quedó agendada', 'quedo agendada', 'quedó confirmada', 'quedo confirmada',
+      'tu cita quedó', 'tu cita quedo', 'nos vemos el', 'ya quedó', 'ya quedo', 'queda agendada', 'queda confirmada'];
+    const replyCierra = frasesCierre.some(f => reply.toLowerCase().includes(f));
+    if (session.oferta_pendiente && !reservaIntentadaEnTurno && replyCierra && !lastBookingFailureMessage) {
+      const herramienta = session.calendar_event_id ? 'reagendar_cita' : 'confirmar_cita';
+      if (!correccionAceptacion && i < MAX_ITERATIONS - 1) {
+        correccionAceptacion = true;
+        console.warn(`⚠️  [OFERTA ACEPTADA] Respuesta de cierre sin agendar — pidiendo ${herramienta}(${session.oferta_pendiente})`);
+        messages.push({ role: 'assistant', content: choice.message.content || '' });
+        messages.push({
+          role: 'system',
+          content:
+            `CORRECCIÓN INTERNA (la clienta no ha visto tu respuesta anterior): la clienta aceptó el horario que le ofreciste ` +
+            `(${session.oferta_pendiente}), pero NO has llamado a ${herramienta}, así que su cita NO está en el calendario. ` +
+            `Llama AHORA a ${herramienta} con ese horario exacto y, según el resultado, confírmale los detalles (fecha, hora y dirección) ` +
+            'o, si falla, dile honestamente que ese espacio ya no está disponible. Si en realidad la clienta NO aceptó ese horario, responde sin decir que su cita quedó.'
+        });
+        continue;
+      }
+      console.warn('⚠️  [OFERTA ACEPTADA] El modelo cerró la conversación sin agendar la oferta aceptada');
     }
 
     // ---- Booking-failure safety net ---------------------------------------
