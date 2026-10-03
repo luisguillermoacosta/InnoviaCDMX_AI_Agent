@@ -1579,12 +1579,65 @@ function formatEventResult(event) {
   };
 }
 
+/**
+ * Update the client details (name, phone, wedding date) of an existing appointment
+ * WITHOUT changing its date/time. Used when the client shares her name or wedding
+ * date after the appointment was already created.
+ *
+ * @param {string} eventId - ID of the appointment event
+ * @param {Object} details - { name, phone, fechaBoda } (any may be omitted)
+ * @returns {Promise<Object|null>} Patched event or null
+ */
+async function updateEventClientInfo(eventId, details, calendarClient, authClient, calendarId) {
+  try {
+    if (!authClient || !eventId) return null;
+    const auth = typeof authClient.getClient === 'function' ? await authClient.getClient() : authClient;
+
+    const current = await calendarClient.events.get({ auth, calendarId, eventId });
+    const ev = current && current.data;
+    if (!ev || ev.status === 'cancelled') return null;
+
+    const formatPhone = (phoneNum) => {
+      const cleaned = String(phoneNum || '').replace(/\D/g, '');
+      if (cleaned.length >= 10) {
+        const last10 = cleaned.slice(-10);
+        return `${last10.slice(0, 2)} ${last10.slice(2, 5)} ${last10.slice(5)}`;
+      }
+      return cleaned;
+    };
+    const formatFechaBoda = (fecha) => {
+      const m = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m ? `${m[3]}/${m[2]}/${m[1]}` : String(fecha);
+    };
+
+    let lines = (ev.description || '').split('\n');
+    const setLine = (prefix, value) => {
+      const idx = lines.findIndex(l => l.toUpperCase().startsWith(prefix));
+      if (idx >= 0) lines[idx] = `${prefix} ${value}`;
+      else lines.unshift(`${prefix} ${value}`);
+    };
+    if (details.phone) setLine('TELEFONO:', formatPhone(details.phone));
+    if (details.fechaBoda) setLine('FECHA DE BODA:', formatFechaBoda(details.fechaBoda));
+
+    const patch = { description: lines.join('\n') };
+    if (details.name && details.name.trim()) patch.summary = details.name.trim();
+
+    const updated = await calendarClient.events.patch({ auth, calendarId, eventId, resource: patch });
+    console.log(`✅ Datos de la clienta actualizados en la cita ${eventId}`);
+    return updated && updated.data ? updated.data : null;
+  } catch (error) {
+    console.error('❌ Error actualizando datos de la clienta en la cita:', error.message);
+    return null;
+  }
+}
+
 module.exports = {
   getAvailableSlots,
   isDayOpen,
   getDefaultSlots,
   createCalendarEvent,
   updateCalendarEvent,
+  updateEventClientInfo,
   deleteCalendarEvent,
   findEventsByName,
   findEventByPhone,

@@ -650,12 +650,15 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       }
       // ───────────────────────────────────────────────────────────────────
 
+      // El teléfono SIEMPRE es el número real de WhatsApp de la clienta — no se
+      // confía en lo que pase el LLM (a veces lo omite o lo inventa). Igual la
+      // fecha de boda: si el LLM no la pasa, se usa la que ya está en sesión.
       const event = await createCalendarEventService(
         nombreFinal,
-        telefono,
+        phone || telefono,
         null,
         hora_inicio,
-        fecha_boda || null,
+        fecha_boda || session.fecha_boda || null,
         calendarClient,
         authClient,
         calendarId

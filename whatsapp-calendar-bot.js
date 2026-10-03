@@ -35,6 +35,7 @@ const {
   getAvailableSlots: getAvailableSlotsService,
   createCalendarEvent: createCalendarEventService,
   updateCalendarEvent: updateCalendarEventService,
+  updateEventClientInfo: updateEventClientInfoService,
   deleteCalendarEvent: deleteCalendarEventService,
   findEventsByName: findEventsByNameService,
   restoreBlueEvent: restoreBlueEventService
@@ -2580,6 +2581,22 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
         if (Object.keys(profileUpdates).length > 0) {
           sessions.updateSession(cleanPhone, profileUpdates);
           session = sessions.getSession(cleanPhone); // Refresh session
+
+          // Si ya tiene cita agendada, reflejar el nombre / fecha de boda nuevos
+          // en el evento del calendario (la clienta los dio después de agendar).
+          if (session.calendar_event_id && (profileUpdates.fecha_boda || profileUpdates.nombre_cliente)) {
+            await updateEventClientInfoService(
+              session.calendar_event_id,
+              {
+                name: profileUpdates.nombre_cliente || null,
+                phone: cleanPhone,
+                fechaBoda: profileUpdates.fecha_boda || null
+              },
+              calendar,
+              authClient,
+              citasNuevasCalendarId || process.env.CALENDAR_ID || 'primary'
+            );
+          }
           
           // Check if we just got nombre (and optionally fecha_boda) for the first time
           // Also check if user has declined to provide fecha_boda
