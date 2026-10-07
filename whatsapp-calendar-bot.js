@@ -2552,7 +2552,10 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
     let profileJustUpdated = false;
     try {
       const currentNombre = getClientName(session);
-      const needsExtraction = !currentNombre || !session.fecha_boda;
+      // Con cita ya agendada también se re-extrae si el mensaje parece traer una
+      // fecha de boda (nueva o corregida) — la clienta suele darla después de agendar.
+      const mencionaFechaBoda = /boda|me caso|nos casamos|\d{1,2}\s*(de\s*)?(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)|\d{1,2}\/\d{1,2}/i.test(incomingMessage || '');
+      const needsExtraction = !currentNombre || !session.fecha_boda || (session.calendar_event_id && mencionaFechaBoda);
       // Don't run extraction for button clicks - it can confuse the extractor
       if (needsExtraction && !options.isButtonClick) {
         const profileData = await extractBrideProfile(session.historial);
@@ -2585,7 +2588,7 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
           // Si ya tiene cita agendada, reflejar el nombre / fecha de boda nuevos
           // en el evento del calendario (la clienta los dio después de agendar).
           if (session.calendar_event_id && (profileUpdates.fecha_boda || profileUpdates.nombre_cliente)) {
-            await updateEventClientInfoService(
+            const actualizado = await updateEventClientInfoService(
               session.calendar_event_id,
               {
                 name: profileUpdates.nombre_cliente || null,
@@ -2596,8 +2599,14 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
               authClient,
               citasNuevasCalendarId || process.env.CALENDAR_ID || 'primary'
             );
+            // Avisar al agente para que le confirme a la clienta que ya quedó
+            // guardada (y no confunda la fecha de boda con un cambio de cita).
+            if (actualizado && profileUpdates.fecha_boda) {
+              sessions.updateSession(cleanPhone, { fecha_boda_recien_guardada: profileUpdates.fecha_boda });
+              session = sessions.getSession(cleanPhone);
+            }
           }
-          
+
           // Check if we just got nombre (and optionally fecha_boda) for the first time
           // Also check if user has declined to provide fecha_boda
           const hasNombre = getClientName(session) && getClientName(session).trim().length > 0;
@@ -2741,6 +2750,10 @@ async function processIncomingMessage(senderPhone, incomingMessage, options = {}
       );
     } finally {
       appointmentCreationLocks.delete(cleanPhone);
+      // El aviso de "fecha de boda recién guardada" solo aplica a este turno.
+      if (sessions.getSession(cleanPhone).fecha_boda_recien_guardada) {
+        sessions.updateSession(cleanPhone, { fecha_boda_recien_guardada: null });
+      }
     }
 
     // Send the agent's natural-language reply.

@@ -59,7 +59,8 @@ IMPORTANTE:
 - Si encuentras una fecha en español (ej: "10 julio ${currentYear}", "24 de febrero ${currentYear}"), conviértela a formato YYYY-MM-DD (ej: "${currentYear}-07-10", "${currentYear}-02-24")
 - Si la fecha mencionada es para visitar el showroom o agendar una cita, NO la extraigas como fecha_boda
 - "este año", "en este año" significa el año ${currentYear} (el año actual indicado arriba)
-- Si no se especifica el año, asume ${currentYear}
+- Si no se especifica el año, usa la PRÓXIMA vez que ocurra esa fecha a partir de hoy (una boda nunca es en el pasado): si ese día ya pasó en ${currentYear}, usa ${currentYear + 1}
+- Si la clienta dio su fecha de boda más de una vez (por ejemplo la corrigió), usa la MÁS RECIENTE
 
 Responde SOLO con un objeto JSON válido en este formato:
 {

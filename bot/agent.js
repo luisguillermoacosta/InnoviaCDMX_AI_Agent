@@ -378,7 +378,7 @@ ${promoInfo}
 - **Teléfono:** ${phone}
 - **Nombre:** ${clientName || 'No proporcionado aún'}
 - **Fecha de boda:** ${session.fecha_boda || 'No proporcionada aún'}
-- **Cita agendada (ID en calendario):** ${session.calendar_event_id || 'Ninguna'}
+${session.fecha_boda_recien_guardada ? `- **AVISO:** En su último mensaje la clienta compartió su fecha de boda (${session.fecha_boda_recien_guardada}) y YA se guardó en su cita del calendario. Respóndele con calidez que quedó registrada (ej: "¡Qué emoción! 💍 Ya anoté tu fecha de boda en tu cita"). Esa fecha es la de su BODA, NO es una petición para cambiar la cita: no llames a reagendar_cita ni a buscar_slots_disponibles por ella. Si en el mismo mensaje pidió algo más, atiéndelo también.\n` : ''}- **Cita agendada (ID en calendario):** ${session.calendar_event_id || 'Ninguna'}
 - **Veces que ya reagendó su cita:** ${session.veces_reagendada || 0}
 - **Horario ofrecido pendiente de que la clienta acepte:** ${session.oferta_pendiente || 'Ninguno'}
 - **Catálogo PDF ya enviado en esta conversación:** ${session.catalogo_enviado ? 'Sí' : 'No'}
