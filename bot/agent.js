@@ -327,6 +327,65 @@ const TOOLS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Fechas: el día de la semana SIEMPRE se calcula en código, nunca el LLM
+// ---------------------------------------------------------------------------
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+  'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/** "2026-10-07" → "miércoles 7 de octubre de 2026" */
+function fechaLegible(isoDate) {
+  const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return isoDate;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return `${DIAS_SEMANA[d.getUTCDay()]} ${+m[3]} de ${MESES[+m[2] - 1]} de ${m[1]}`;
+}
+
+/** "2026-10-07T11:00:00-06:00" → "miércoles 7 de octubre de 2026 a las 11:00 a.m." (hora CDMX) */
+function fechaHoraLegible(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return fechaLegible(iso);
+  if (!String(iso).includes('T')) return fechaLegible(iso);
+  const dia = d.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  const hora = d.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${fechaLegible(dia)} a las ${hora}`;
+}
+
+/** "2026-10-06" + 3 → "2026-10-09" */
+function sumarDias(isoDate, n) {
+  const [y, mo, d] = isoDate.split('-').map(Number);
+  return new Date(Date.UTC(y, mo - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/**
+ * Red de seguridad: corrige "sábado 7 de octubre" → "miércoles 7 de octubre"
+ * en la respuesta final. Solo toca frases con día de la semana + número + mes,
+ * y toma el año siguiente si esa fecha ya pasó este año.
+ */
+function corregirDiasSemana(texto) {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  const re = /\b(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)(,?\s+)(\d{1,2})(\s+de\s+)(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(\s+(?:de\s+|del\s+)?(\d{4}))?/gi;
+  return texto.replace(re, (full, dia, sep, num, de, mes, resto, anio) => {
+    const mesIdx = MESES.indexOf(mes.toLowerCase());
+    let year = anio ? +anio : +hoy.slice(0, 4);
+    let iso = `${year}-${String(mesIdx + 1).padStart(2, '0')}-${String(+num).padStart(2, '0')}`;
+    if (!anio && iso < hoy) {
+      year += 1;
+      iso = `${year}-${iso.slice(5)}`;
+    }
+    const d = new Date(Date.UTC(year, mesIdx, +num));
+    if (d.getUTCDate() !== +num) return full; // fecha inválida (ej. 31 de junio)
+    const correcto = DIAS_SEMANA[d.getUTCDay()];
+    const normal = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (normal(dia) === normal(correcto)) return full;
+    console.warn(`⚠️  [DÍA SEMANA] Corrigiendo "${full}": era ${correcto}`);
+    const corregido = dia[0] === dia[0].toUpperCase() ? correcto[0].toUpperCase() + correcto.slice(1) : correcto;
+    return `${corregido}${sep}${num}${de}${mes}${resto || ''}`;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // System prompt builder
 // ---------------------------------------------------------------------------
 function buildSystemPrompt(session, phone) {
@@ -359,9 +418,16 @@ function buildSystemPrompt(session, phone) {
   const slotsInfo =
     session.slots_disponibles && session.slots_disponibles.length > 0
       ? `- **Horarios mostrados recientemente:** ${session.slots_disponibles
-          .map((s, i) => `${i + 1}. ${s.time} (inicio ISO: ${s.start})`)
+          .map((s, i) => `${i + 1}. ${fechaLegible((s.start || '').slice(0, 10))} ${s.time} (inicio ISO: ${s.start})`)
           .join(', ')}`
       : '';
+
+  // Calendario de referencia: el LLM se equivoca calculando el día de la semana
+  // ("sábado 7 de octubre" cuando era miércoles), así que se le da ya calculado.
+  const proximosDias = Array.from({ length: 21 }, (_, i) => {
+    const iso = sumarDias(todayCDMX, i);
+    return `${iso} = ${fechaLegible(iso)}${i === 0 ? ' (hoy)' : i === 1 ? ' (mañana)' : ''}`;
+  }).join('\n');
 
   return `Eres ${biz.asesora_nombre || 'la asesora'} de ${biz.nombre}, una boutique de vestidos de novia ubicada en CDMX. Atiendes a clientas por WhatsApp de forma cálida, personal y completamente conversacional.
 
@@ -386,6 +452,10 @@ ${slotsInfo}
 
 ## Fecha de hoy
 Hoy es ${today}.
+
+## Calendario de los próximos días (FUENTE OFICIAL del día de la semana)
+${proximosDias}
+**Nunca calcules el día de la semana por tu cuenta.** Para convertir "el sábado", "mañana", "el próximo martes", etc. a fecha, búscalo en esta lista. Al mencionar una fecha a la clienta, usa exactamente el día de la semana que aparece aquí (o el que devuelvan las herramientas).
 
 ## Instrucciones de comportamiento
 1. **Genera siempre la respuesta en lenguaje natural.** Nunca copies mensajes predefinidos o rígidos.
@@ -498,15 +568,17 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
 
       const available = slots.filter(s => s.availableSpots && s.availableSpots > 0);
 
+      const diaLegible = fechaLegible(fecha);
       return {
         fecha,
+        dia_semana: diaLegible,
         slots_disponibles: available,
         resultado:
           available.length > 0
-            ? `Hay ${available.length} horario(s) disponible(s) para ${fecha}:\n${available
+            ? `Hay ${available.length} horario(s) disponible(s) para el ${diaLegible} (${fecha}):\n${available
                 .map((s, i) => `${i + 1}. ${s.time}  (inicio: ${s.start})`)
-                .join('\n')}`
-            : `No hay horarios disponibles para ${fecha}.`
+                .join('\n')}\nAl mencionarle esta fecha a la clienta di exactamente "${diaLegible}". Si la clienta pidió otro día de la semana, esta fecha está mal: busca la correcta en el calendario de referencia.`
+            : `No hay horarios disponibles para el ${diaLegible} (${fecha}).`
       };
     }
 
@@ -525,7 +597,9 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       if (session.calendar_event_id && !nombreOverride) {
         const sessionsModule = require('../sessions');
         const sessionData = sessionsModule.getSession(phone) || session;
-        const knownDate = sessionData.fecha_cita || session.fecha_cita || 'fecha registrada';
+        const knownDate = (sessionData.fecha_cita || session.fecha_cita)
+          ? fechaLegible(sessionData.fecha_cita || session.fecha_cita)
+          : 'fecha registrada';
         console.log(`📋 buscar_cita_cliente: cita ya conocida en sesión (event_id=${session.calendar_event_id})`);
         return {
           encontrada: true,
@@ -550,13 +624,15 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         const sessions = require('../sessions');
         sessions.updateSession(phone, { calendar_event_id: event.id });
 
+        const fechaCita = event.start ? fechaHoraLegible(event.start) : `${event.formattedDate} a las ${event.formattedTime}`;
         return {
           encontrada: true,
           event_id: event.id,
           resumen: event.summary,
           fecha: event.formattedDate,
           hora: event.formattedTime,
-          mensaje: `Cita encontrada: "${event.summary}" — ${event.formattedDate} a las ${event.formattedTime}. ID: ${event.id}`
+          fecha_legible: fechaCita,
+          mensaje: `Cita encontrada: "${event.summary}" — ${fechaCita}. ID: ${event.id}. Al mencionar la fecha usa exactamente "${fechaCita}" — no calcules el día de la semana.`
         };
       }
 
@@ -724,7 +800,14 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         console.warn(`⚠️  No se pudo obtener la hora de inicio del evento para restaurar el slot azul`);
       }
 
-      return { exito: true, mensaje: 'Cita cancelada exitosamente.' };
+      const fechaCancelada = fechaHoraLegible(startIso);
+      return {
+        exito: true,
+        fecha_cancelada: fechaCancelada,
+        mensaje: fechaCancelada
+          ? `Cita del ${fechaCancelada} cancelada exitosamente. Si mencionas la fecha, usa exactamente "${fechaCancelada}" — no calcules el día de la semana.`
+          : 'Cita cancelada exitosamente. No menciones el día de la semana de la cita cancelada.'
+      };
     }
 
     // ---- reagendar_cita --------------------------------------------------
@@ -817,10 +900,12 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         console.log(`🗑️  Eliminando slot azul del nuevo horario en Innovia CDMX (ID: ${matchingSlot.eventId})`);
         await deleteCalendarEventService(matchingSlot.eventId, calendarClient, authClient, innoviaCDMXCalendarId);
 
+        const nuevaFecha = fechaHoraLegible(nueva_hora_inicio);
         return {
           exito: true,
           event_id: event.id,
-          mensaje: 'Cita reagendada exitosamente.'
+          fecha_confirmada: nuevaFecha,
+          mensaje: `Cita reagendada exitosamente para el ${nuevaFecha}. Usa exactamente esta fecha al confirmarle a la clienta — no calcules el día de la semana.`
         };
       }
       return { exito: false, mensaje: 'No se pudo reagendar la cita.' };
@@ -1183,6 +1268,8 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
       console.warn(`⚠️  [BOOKING SAFETY NET] Sobrescribiendo respuesta — última reserva/reagendado falló: ${lastBookingFailureMessage}`);
       reply = `${lastBookingFailureMessage} 🙏 Déjame buscarte otro horario disponible — ¿qué día te queda mejor?`;
     }
+
+    reply = corregirDiasSemana(reply);
 
     console.log(`🤖 Agent reply (${reply.length} chars)`);
 
