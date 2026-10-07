@@ -69,20 +69,20 @@ Responde SOLO con un objeto JSON válido en este formato:
 
 No agregues explicaciones, solo el JSON.`;
 
-    // Filter to only include user messages for extraction (bot messages can confuse the extractor)
-    // We'll include the last few bot messages for context, but focus on user messages
-    const userMessages = conversationHistory.filter(msg => msg.role === 'user');
-    
-    // If we have user messages, use them; otherwise use all messages
-    const messagesToUse = userMessages.length > 0 ? userMessages : conversationHistory;
-    
-    // Build messages array from conversation history (focus on user messages)
+    // Se manda la conversación como transcripción (Bot / Clienta) para que el
+    // extractor vea la pregunta del bot. Sin eso, una respuesta suelta como
+    // "el 20 de marzo" a "¿para cuándo es tu boda?" es ambigua y se descarta.
+    const transcript = conversationHistory
+      .slice(-30)
+      .map(msg => `${msg.role === 'user' ? 'Clienta' : 'Bot'}: ${msg.content}`)
+      .join('\n');
+
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...messagesToUse.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
+      {
+        role: 'user',
+        content: `Conversación (extrae SOLO datos que la Clienta dio sobre sí misma; usa los mensajes del Bot solo como contexto para entender a qué responde):\n\n${transcript}`
+      }
     ];
 
     console.log(`🔍 Extrayendo perfil de cliente (${conversationHistory.length} mensajes)`);

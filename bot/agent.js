@@ -593,6 +593,20 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         };
       }
 
+      // GUARD: preguntar la fecha de boda UNA sola vez antes de agendar.
+      // No es requisito: si ya se preguntó (o la clienta la declinó), se agenda
+      // aunque no la tengamos. Solo evita que el LLM se salte la pregunta.
+      if (!fecha_boda && !session.fecha_boda && !session.fecha_boda_preguntada && !session.fecha_boda_declinada) {
+        console.warn(`⚠️  confirmar_cita pausada: aún no se ha preguntado la fecha de boda`);
+        session.fecha_boda_preguntada = true;
+        if (phone) require('../sessions').updateSession(phone, { fecha_boda_preguntada: true });
+        return {
+          exito: false,
+          pendiente_fecha_boda: true,
+          mensaje: 'La cita AÚN NO está agendada. Antes de agendar, pregunta a la clienta para cuándo es su boda (ej: "¡Perfecto! Antes de apartar tu cita, ¿para cuándo es tu boda? 💍"). NO le digas que hubo un error ni que el horario no está disponible. Cuando responda, llama de nuevo a confirmar_cita con el mismo horario: con fecha_boda en formato YYYY-MM-DD si la dio, o con fecha_boda null si no la sabe o no la quiere dar.'
+        };
+      }
+
       // SAFETY GUARD: If the session already has an appointment, delete it before creating
       // a new one. This handles cases where the agent mistakenly calls confirmar_cita
       // instead of reagendar_cita when the client already has a scheduled appointment.
@@ -1070,7 +1084,8 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           // lo que se le debe decir a la clienta en ese caso (ver regla 8b).
           if (result.exito) {
             lastBookingFailureMessage = null;
-          } else if (!result.limite_alcanzado) {
+          } else if (!result.limite_alcanzado && !result.pendiente_fecha_boda) {
+            // pendiente_fecha_boda tampoco es falta de cupo: solo falta preguntar la boda.
             lastBookingFailureMessage = 'Ese horario ya no tiene cupo disponible';
           }
         }
