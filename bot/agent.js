@@ -386,6 +386,39 @@ function corregirDiasSemana(texto) {
 }
 
 // ---------------------------------------------------------------------------
+// Validación del nombre al agendar
+// ---------------------------------------------------------------------------
+const NOMBRES_RELLENO = new Set([
+  'cliente', 'clienta', 'novia', 'nombre', 'sin', 'no', 'proporcionado', 'proporcionada',
+  'aun', 'desconocido', 'desconocida', 'usuario', 'usuaria', 'anonimo', 'anonima',
+  'senorita', 'senora', 'srita', 'sra', 'na', 'n/a', 'pendiente', 'ninguno', 'ninguna'
+]);
+
+const normalizarTexto = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/**
+ * true si el nombre parece real y la clienta lo escribió en la conversación
+ * (o ya lo tenemos en sesión por el extractor de perfil). Rechaza rellenos
+ * como "Clienta" o "No proporcionado aún" y valores con dígitos (teléfono).
+ */
+function nombreEsDeLaClienta(nombre, session) {
+  const norm = normalizarTexto(nombre).trim();
+  if (!norm || /\d/.test(norm)) return false;
+
+  const palabras = norm.split(/[^a-zñ]+/).filter(p => p.length >= 2 && !NOMBRES_RELLENO.has(p));
+  if (palabras.length === 0) return false;
+
+  const nombreSesion = getClientName(session);
+  if (nombreSesion && normalizarTexto(nombreSesion).trim() === norm) return true;
+
+  const textoClienta = (session.historial || [])
+    .filter(m => m.role === 'user')
+    .map(m => normalizarTexto(m.content))
+    .join(' ');
+  return palabras.some(p => new RegExp(`(^|[^a-zñ])${p}($|[^a-zñ])`).test(textoClienta));
+}
+
+// ---------------------------------------------------------------------------
 // System prompt builder
 // ---------------------------------------------------------------------------
 function buildSystemPrompt(session, phone) {
@@ -470,6 +503,7 @@ ${proximosDias}
    - Llama a \`buscar_slots_disponibles\` para ver disponibilidad.
    - **Si no hay horarios disponibles en la fecha solicitada (entre semana):** NO preguntes si quiere buscar en otra fecha — búscala tú directamente. Llama de inmediato a \`buscar_slots_disponibles\` para los siguientes 2-3 días hábiles. Presenta las alternativas encontradas directamente, por ejemplo: "No tenemos disponibilidad ese día, pero sí tenemos estos horarios para [fecha alternativa]: [lista de slots]". Si tras buscar 2-3 fechas alternativas tampoco hay nada, entonces sí informa que no hay disponibilidad próxima y ofrece intentar una fecha más lejana.
    - Muestra los horarios disponibles de forma clara y amigable.
+   - **El nombre SÍ es obligatorio.** Si en el contexto el Nombre dice "No proporcionado aún", pide su nombre completo antes de llamar a \`confirmar_cita\`. Nunca inventes un nombre ni pases "Clienta", "Novia", "No proporcionado aún" o el teléfono como \`nombre_cliente\`.
    - Antes de llamar a \`confirmar_cita\`, intenta obtener la fecha de boda una sola vez: "¿Y para cuándo es tu boda? 💍".
    - **REGLA ABSOLUTA — la fecha de boda NUNCA es condición para agendar.** No tener fecha de boda, no saberla, o no responder claramente a esa pregunta NO es motivo para negar, bloquear, posponer, ni dejar de confirmar la cita. Si la clienta dice que no la tiene, no la sabe, la ignora, o responde cualquier otra cosa, sigue adelante exactamente igual: llama a \`confirmar_cita\` pasando \`fecha_boda: null\`. La cita se agenda siempre que haya nombre, teléfono y un horario con cupo — la fecha de boda jamás forma parte de esa condición.
    - **Cuando la clienta ya eligió un horario y ya preguntaste (o intentaste preguntar) la fecha de boda, llama a \`confirmar_cita\` de inmediato** — sin pedir confirmación adicional y sin esperar más turnos por la fecha de boda. El hecho de que la clienta seleccione un horario ya es su confirmación implícita. Después de agendar, envía un mensaje confirmando los detalles (fecha, hora, dirección).
@@ -666,6 +700,18 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
         return {
           exito: false,
           error: 'No puedes agendar la cita sin el nombre de la clienta. Pregúntale su nombre completo antes de continuar.'
+        };
+      }
+
+      // GUARD: el nombre debe ser real y haberlo escrito la clienta. Sin esto el
+      // LLM rellenaba el campo con "Clienta", "No proporcionado aún", el teléfono,
+      // etc., y la cita quedaba agendada sin nombre.
+      if (!nombreEsDeLaClienta(nombreFinal, session)) {
+        console.warn(`⚠️  confirmar_cita pausada: nombre "${nombreFinal}" no es un nombre dado por la clienta`);
+        return {
+          exito: false,
+          pendiente_nombre: true,
+          mensaje: 'La cita AÚN NO está agendada porque la clienta no ha dado su nombre. Pregúntale amablemente su nombre completo (nombre y apellido) antes de apartar el horario — NO inventes un nombre ni uses "Clienta", "Novia" o similares, y NO le digas que el horario no está disponible. Cuando lo dé, llama de nuevo a confirmar_cita con el mismo horario y su nombre.'
         };
       }
 
@@ -874,7 +920,9 @@ async function executeTool(toolName, toolArgs, calendarDeps, session, phone) {
       const existingEvent = await getCalendarEventService(event_id, calendarClient, authClient, calendarId);
       const oldStartIso = existingEvent?.start?.dateTime || existingEvent?.start?.date || null;
 
-      const clientName = getClientName(session) || 'Cliente';
+      // Si la sesión no tiene nombre, conservar el título actual del evento en
+      // vez de sobrescribirlo con "Cliente".
+      const clientName = getClientName(session) || (existingEvent?.summary || '').trim() || 'Cliente';
       const event = await updateCalendarEventService(
         event_id,
         clientName,
@@ -1169,7 +1217,7 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
           // lo que se le debe decir a la clienta en ese caso (ver regla 8b).
           if (result.exito) {
             lastBookingFailureMessage = null;
-          } else if (!result.limite_alcanzado && !result.pendiente_fecha_boda) {
+          } else if (!result.limite_alcanzado && !result.pendiente_fecha_boda && !result.pendiente_nombre) {
             // pendiente_fecha_boda tampoco es falta de cupo: solo falta preguntar la boda.
             lastBookingFailureMessage = 'Ese horario ya no tiene cupo disponible';
           }
