@@ -15,6 +15,17 @@
 const { getBusinessHours, getHolidays } = require('../config');
 
 /**
+ * Fecha y hora actual en CDMX, para registrar cuándo el bot hizo la cita
+ * @returns {string} Ej. "23/10/2026 4:35 p.m."
+ */
+function nowCDMXLabel() {
+  const now = new Date();
+  const fecha = now.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const hora = now.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${fecha} ${hora}`;
+}
+
+/**
  * Check if a day is open according to business hours
  * @param {string} dateString - Date in YYYY-MM-DD format
  * @returns {boolean} True if day is open
@@ -909,7 +920,7 @@ async function createCalendarEvent(name, phone, email, dateStart, fechaBoda, cal
     if (email) {
       description += `EMAIL: ${email}\n`;
     }
-    description += '\n*Cita creada por Calendar bot*';
+    description += `\n*Cita creada por Calendar bot el ${nowCDMXLabel()}*`;
     
     // Formatear fecha/hora en formato RFC3339 para CDMX
     // CRITICAL: Usar toLocaleString para obtener componentes en CDMX, no métodos locales del servidor
@@ -1122,7 +1133,7 @@ async function updateCalendarEvent(eventId, name, phone, email, dateStart, fecha
     if (email) {
       description += `EMAIL: ${email}\n`;
     }
-    description += '\n*Cita reagendada por Calendar bot*';
+    description += `\n*Cita reagendada por Calendar bot el ${nowCDMXLabel()}*`;
     
     // Formatear fecha/hora en formato RFC3339 para CDMX
     const formatDateTimeForCDMX = (date) => {

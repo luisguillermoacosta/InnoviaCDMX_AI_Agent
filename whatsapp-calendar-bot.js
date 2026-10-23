@@ -883,6 +883,7 @@ async function decideImageAction(captions, historial, clientName) {
       .join('\n');
 
     const captionText = captions.filter(Boolean).join(', ');
+    const techoPromocion = ((bizConfig.precios && bizConfig.precios.techo_promocion) || 30000).toLocaleString('es-MX');
 
     const prompt = `Eres el asistente de ${bizConfig.businessName || 'una boutique de vestidos de novia'}.
 Una clienta acaba de enviar ${captions.length === 1 ? 'una imagen' : `${captions.length} imágenes`}.
@@ -894,6 +895,10 @@ ${recentHistory || '(sin historial previo)'}
 Decide si esta imagen requiere escalar a un humano o si puedes responder tú mismo.
 ESCALA si: parece un comprobante de pago, transferencia, recibo, o documento importante.
 NO ESCALES si: parece una foto de vestido, modelo, inspiración o referencia de moda — en ese caso responde con entusiasmo, comenta sobre el estilo y ofrece agendar una cita para verlo en persona.
+
+PRECIOS — REGLA ABSOLUTA: NUNCA inventes precios, rangos ("entre $X y $Y"), ni precios por modelo. No existe lista de precios por modelo.
+- Si NO te preguntan el precio, no menciones precios.
+- Si preguntan cuánto cuesta (ese modelo o en general), di solo: "nuestros vestidos, ya con promoción, inician en $${techoPromocion} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales", y que el precio exacto lo confirman las asesoras en el showroom. Nunca des otra cifra.
 
 Responde SOLO con JSON: {"accion": "escalar"} o {"accion": "responder", "mensaje": "tu respuesta aquí"}`;
 
