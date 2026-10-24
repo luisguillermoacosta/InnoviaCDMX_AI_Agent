@@ -898,7 +898,7 @@ NO ESCALES si: parece una foto de vestido, modelo, inspiración o referencia de 
 
 PRECIOS — REGLA ABSOLUTA: NUNCA inventes precios, rangos ("entre $X y $Y"), ni precios por modelo. No existe lista de precios por modelo.
 - Si NO te preguntan el precio, no menciones precios.
-- Si preguntan cuánto cuesta (ese modelo o en general), di solo: "nuestros vestidos, ya con promoción, inician en $${techoPromocion} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales", y que el precio exacto lo confirman las asesoras en el showroom. Nunca des otra cifra.
+- Si preguntan cuánto cuesta (ese modelo o en general), di solo: "nuestros vestidos inician en $${techoPromocion} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales", y que el precio exacto lo confirman las asesoras en el showroom, donde con su visita puede haber descuentos y sorpresas adicionales. Invítala a agendar su cita para aprovecharlos. Nunca des otra cifra ni porcentajes de descuento, y no digas "ya con promoción".
 
 Responde SOLO con JSON: {"accion": "escalar"} o {"accion": "responder", "mensaje": "tu respuesta aquí"}`;
 
