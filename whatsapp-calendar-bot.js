@@ -407,10 +407,24 @@ try {
 let STAFF_PHONES = [];
 let EXISTING_CLIENTS = [];
 
+// Se compara por sufijo (endsWith), así que una entrada corta como "5" o "26"
+// silenciaría a toda clienta cuyo número termine así. Se descartan entradas de
+// menos de MIN_PHONE_SUFFIX_DIGITS dígitos.
+const MIN_PHONE_SUFFIX_DIGITS = 8;
+function cleanPhoneList(list) {
+  return (list || [])
+    .map(p => String(p).replace(/\D/g, ''))
+    .filter(p => {
+      if (p.length >= MIN_PHONE_SUFFIX_DIGITS) return true;
+      if (p) console.warn(`⚠️  Número descartado de la lista (muy corto, silenciaría a otras clientas): "${p}"`);
+      return false;
+    });
+}
+
 function loadRuntimePhones() {
   const biz = getBizConfig() || {};
-  STAFF_PHONES = (biz.staff_phones || []).map(p => p.replace(/\D/g, ''));
-  EXISTING_CLIENTS = (biz.existing_clients || []).map(p => p.replace(/\D/g, ''));
+  STAFF_PHONES = cleanPhoneList(biz.staff_phones);
+  EXISTING_CLIENTS = cleanPhoneList(biz.existing_clients);
   if (biz._adminPhone) {
     ADMIN_PHONE = biz._adminPhone;
     console.log(`✅ ADMIN_PHONE cargado desde DB: ${ADMIN_PHONE}`);
@@ -3584,12 +3598,12 @@ app.put('/api/config', async (req, res) => {
     if (precios)   currentConfig.precios   = { ...currentConfig.precios,   ...precios   };
 
     if (Array.isArray(staffPhones)) {
-      currentConfig.staff_phones = staffPhones.map(p => p.replace(/\D/g, '')).filter(Boolean);
+      currentConfig.staff_phones = cleanPhoneList(staffPhones);
       STAFF_PHONES = currentConfig.staff_phones;
       console.log(`✅ STAFF_PHONES actualizado: ${STAFF_PHONES.length} números`);
     }
     if (Array.isArray(existingClients)) {
-      currentConfig.existing_clients = existingClients.map(p => p.replace(/\D/g, '')).filter(Boolean);
+      currentConfig.existing_clients = cleanPhoneList(existingClients);
       EXISTING_CLIENTS = currentConfig.existing_clients;
       console.log(`✅ EXISTING_CLIENTS actualizado: ${EXISTING_CLIENTS.length} números`);
     }
