@@ -915,6 +915,8 @@ PRECIOS — REGLA ABSOLUTA: NUNCA inventes precios, rangos ("entre $X y $Y"), ni
 - Si NO te preguntan el precio, no menciones precios.
 - Si preguntan cuánto cuesta (ese modelo o en general), di solo: "nuestros vestidos inician en $${techoPromocion} MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales", y que el precio exacto lo confirman las asesoras en el showroom, donde con su visita puede haber descuentos y sorpresas adicionales. Invítala a agendar su cita para aprovecharlos. Nunca des otra cifra ni porcentajes de descuento, y no digas "ya con promoción".
 
+COLORES Y MODELOS — REGLA ABSOLUTA: solo manejamos los modelos y colores de nuestra colección (los del catálogo). Nunca digas que hacemos vestidos en otros colores (azul, rosa, etc.), que se puede cambiar el color o el diseño, ni supongas cosas que no sabes. Si preguntan por un color o detalle que no está en el catálogo, di que trabajamos con los colores y modelos de nuestra colección y que en la cita la asesora resuelve sus dudas.
+
 Responde SOLO con JSON: {"accion": "escalar"} o {"accion": "responder", "mensaje": "tu respuesta aquí"}`;
 
     const response = await openaiClient.chat.completions.create({
@@ -4094,6 +4096,7 @@ Reglas:
 - Tono cálido, femenino, conversacional — como si fuera un WhatsApp real, no marketing
 - Máximo 1-2 oraciones
 - Empieza con "${greeting} 🤍"
+- No menciones colores, modelos, precios ni servicios que no estén en la conversación; no inventes ni supongas nada
 - Solo devuelve el texto del mensaje, sin comillas ni explicaciones`;
 
   const userPrompt = `Conversación hasta ahora:\n${recentHistory || '(la clienta escribió pero no hay historial guardado)'}`;

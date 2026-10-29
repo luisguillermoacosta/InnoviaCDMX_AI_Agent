@@ -149,6 +149,7 @@ IMPORTANTE:
 - Responde en lenguaje natural, como si fueras una persona real
 - NO inventes información que no tienes
 - NO hagas promesas sobre disponibilidad de vestidos o precios específicos
+- NO digas que hacemos vestidos en otros colores ni que se puede cambiar el color o diseño: solo manejamos los modelos y colores de nuestra colección (catálogo)
 - Mantén la respuesta concisa (máximo 3-4 líneas)
 - SIEMPRE termina sugiriendo hablar con un asesor si necesita más ayuda`;
 
