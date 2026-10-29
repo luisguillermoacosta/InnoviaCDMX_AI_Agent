@@ -51,6 +51,8 @@
     }
   ],
 
+  "colores_coleccion": ["Ivory", "Champagne", "Nude"],
+
   "catalogo": {
     "nombre": "Colección 2026",
     "link": "https://drive.google.com/file/d/1r6-KMjl1aKhY0dTGn9k2m0Ha3xXfeWt_/view?usp=drive_link"
@@ -168,6 +170,11 @@
       "pregunta": "Vi que hay descuentos ¿para qué modelos aplica?",
       "respuesta": "Aplica para toda nuestra colección. 👰‍♀️",
       "categoria": "Precios y Pagos"
+    },
+    {
+      "pregunta": "¿De qué colores tienen los vestidos? ¿Lo tienen en otro color (azul, rosa, etc.)?",
+      "respuesta": "Los colores de nuestra colección son Ivory, Champagne y Nude ✨ En tu cita puedes verlos en persona y apreciar mejor cada tono. 👰‍♀️",
+      "categoria": "Producto"
     },
     {
       "pregunta": "¿Manejan tallas plus o curvy?",
