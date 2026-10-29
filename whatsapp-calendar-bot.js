@@ -15,6 +15,7 @@ const {
   getAppointmentConfirmationMessage,
   init: initBizConfig,
   save: saveBizConfig,
+  patch: patchBizConfig,
   get:  getBizConfig
 } = require('./config');
 
@@ -2083,6 +2084,14 @@ app.post('/webhook', async (req, res) => {
 // Modos: 'inactive' (inactivo), 'test' (solo +19179605545), 'active' (todos)
 function getBotMode() {
   try {
+    // Fuente principal: la base de datos (bot_config). El archivo bot_status.json
+    // vive dentro del contenedor y se borra en cada deploy de Railway, lo que
+    // dejaba el bot en 'inactive' tras cada push.
+    const dbMode = (getBizConfig() || {}).bot_mode;
+    if (['inactive', 'test', 'active'].includes(dbMode)) {
+      return dbMode;
+    }
+
     // CRITICAL: Usar path absoluto para Railway
     const statusPath = path.join(__dirname, 'bot_status.json');
     console.log(`🔍 [GET BOT MODE] Leyendo archivo: ${statusPath}`);
@@ -2177,6 +2186,12 @@ function setBotMode(mode) {
     
     fs.writeFileSync(statusPath, jsonData, 'utf8');
     console.log(`💾 Archivo escrito en: ${statusPath}`);
+
+    // Persistir también en la base de datos para que sobreviva a los deploys.
+    // patch() actualiza la config en memoria al instante; el guardado en DB es async.
+    patchBizConfig({ bot_mode: mode })
+      .then(() => console.log(`💾 Modo "${mode}" guardado en la base de datos`))
+      .catch(err => console.error(`❌ No se pudo guardar el modo en la base de datos: ${err.message}`));
     
     // Verificar que se escribió correctamente
     if (fs.existsSync(statusPath)) {
