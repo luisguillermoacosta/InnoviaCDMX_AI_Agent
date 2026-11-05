@@ -48,6 +48,14 @@
       "fin": "2026-09-27",
       "descuento_maximo": 50,
       "descripcion": "Descuentos de hasta 50% en catálogo. A pesar del nombre, las citas son en el horario normal de tienda, no hay citas nocturnas."
+    },
+    {
+      "nombre": "Mega oferta Buen Fin",
+      "inicio": "2026-11-01",
+      "fin": "2026-11-30",
+      "descuento_maximo": null,
+      "descripcion": "Todo noviembre tenemos los descuentos más importantes de todo el año por el BUEN FIN. No menciones porcentajes ni cifras de descuento: los descuentos exactos los da la asesora en la cita.",
+      "recordatorio": "Este NOVIEMBRE tenemos los descuentos más importantes de todo el año por el *BUEN FIN* ✨"
     }
   ],
 

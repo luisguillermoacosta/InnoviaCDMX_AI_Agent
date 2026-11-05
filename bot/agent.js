@@ -421,6 +421,20 @@ function nombreEsDeLaClienta(nombre, session) {
 // ---------------------------------------------------------------------------
 // System prompt builder
 // ---------------------------------------------------------------------------
+// Promoción vigente HOY (inicio ≤ hoy ≤ fin) que tenga frase de recordatorio.
+function promoVigenteHoy() {
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  return getPromotions().find(p => p.recordatorio && p.inicio <= hoy && hoy <= p.fin) || null;
+}
+
+// La promo vigente si a esta clienta todavía no se le recordó hoy; si no, null.
+function getPromoParaRecordarHoy(session) {
+  const promo = promoVigenteHoy();
+  if (!promo) return null;
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+  return session.promo_recordada_fecha === hoy ? null : promo;
+}
+
 function buildSystemPrompt(session, phone) {
   const biz = getBusinessInfo();
   const hours = getBusinessHours();
@@ -446,8 +460,16 @@ function buildSystemPrompt(session, phone) {
   const promotions = getPromotions();
   const activePromo = promotions.find(p => todayCDMX <= p.fin);
   const promoInfo = activePromo
-    ? `\n## Promoción de alta demanda: ${activePromo.nombre}\n- Vigencia: del ${activePromo.inicio} al ${activePromo.fin} (ambos incluidos).\n- ${activePromo.descripcion}\n- Descuento: hasta ${activePromo.descuento_maximo}% en catálogo.\n- **La regla 6b (alta demanda) aplica ÚNICAMENTE cuando la fecha de la CITA que pide la clienta cae dentro de ${activePromo.inicio} a ${activePromo.fin}** — sin importar la fecha de hoy. Para cualquier fecha de cita fuera de ese rango, esta promoción no aplica y sigues el flujo normal (o la regla 6b solo si es sábado/domingo).\n`
+    ? `\n## Promoción de alta demanda: ${activePromo.nombre}\n- Vigencia: del ${activePromo.inicio} al ${activePromo.fin} (ambos incluidos).\n- ${activePromo.descripcion}\n${activePromo.descuento_maximo ? `- Descuento: hasta ${activePromo.descuento_maximo}% en catálogo.\n` : ''}- **La regla 6b (alta demanda) aplica ÚNICAMENTE cuando la fecha de la CITA que pide la clienta cae dentro de ${activePromo.inicio} a ${activePromo.fin}** — sin importar la fecha de hoy. Para cualquier fecha de cita fuera de ese rango, esta promoción no aplica y sigues el flujo normal (o la regla 6b solo si es sábado/domingo).\n`
     : '';
+
+  // Recordatorio de la promo: máximo 1 vez al día por clienta, solo mientras
+  // la promoción está vigente hoy. runAgent marca promo_recordada_fecha cuando
+  // la respuesta ya la mencionó.
+  const promoHoy = getPromoParaRecordarHoy(session);
+  const promoRecordatorio = promoHoy
+    ? `\n## Recordatorio de promoción (hoy)\n- Hoy todavía no le has recordado la promoción a esta clienta. En esta respuesta menciónala UNA vez, de forma natural y breve, con esta idea: "${promoHoy.recordatorio}". No menciones porcentajes ni cifras de descuento.\n`
+    : (promoVigenteHoy() ? `\n## Recordatorio de promoción (hoy)\n- Ya le recordaste hoy la promoción a esta clienta: no la vuelvas a mencionar en esta respuesta salvo que ella pregunte por promociones o descuentos.\n` : '');
 
   const slotsInfo =
     session.slots_disponibles && session.slots_disponibles.length > 0
@@ -474,7 +496,7 @@ function buildSystemPrompt(session, phone) {
 - **Con promociones directas con la asesora en cita, se puede llegar a encontrar en:** menos de $${(pricing.techo_promocion || 30000).toLocaleString()} MXN
 - **Colores de la colección (los únicos que manejamos):** ${colores}
 - **Nota precios:** ${pricing.nota || 'Los precios varían según modelo y personalizaciones'}
-${promoInfo}
+${promoInfo}${promoRecordatorio}
 ## Contexto de la clienta
 - **Teléfono:** ${phone}
 - **Nombre:** ${clientName || 'No proporcionado aún'}
@@ -1357,6 +1379,12 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
       sessionsModule.updateSession(phone, { escalated_to_human: true, resolved_by_agent: false });
     }
 
+    // Marcar el recordatorio de promo del día si la respuesta ya la mencionó
+    const promoPendiente = getPromoParaRecordarHoy(session);
+    if (promoPendiente && /buen\s*fin/i.test(reply)) {
+      sessionUpdates.promo_recordada_fecha = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+    }
+
     return { reply, sessionUpdates, sendCatalogPdf: shouldSendCatalogPdf };
   }
 
@@ -1367,4 +1395,4 @@ async function runAgent(phone, session, message, calendarDeps, isButtonClick = f
   };
 }
 
-module.exports = { runAgent, PAUSE_MARKER };
+module.exports = { runAgent, PAUSE_MARKER, getPromoParaRecordarHoy };

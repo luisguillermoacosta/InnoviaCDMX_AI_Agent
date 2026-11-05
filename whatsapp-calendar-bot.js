@@ -4088,6 +4088,13 @@ async function generateRecoveryMessage(session) {
     .map(m => `${m.role === 'user' ? 'Clienta' : 'Bot'}: ${m.content}`)
     .join('\n');
 
+  // Recordatorio de promoción vigente (máx. 1 vez al día por clienta)
+  const { getPromoParaRecordarHoy } = require('./bot/agent');
+  const promoHoy = getPromoParaRecordarHoy(session);
+  const promoRegla = promoHoy
+    ? `\n- Además, recuérdale de forma natural y breve: "${promoHoy.recordatorio}" (sin porcentajes ni cifras de descuento), e invítala a agendar su cita. En este caso puedes usar hasta 3 oraciones`
+    : '';
+
   const systemPrompt = `Eres la asistente de ${bizConfig.businessName || 'una boutique de vestidos de novia'}.
 Una clienta no ha respondido desde hace varias horas. Tu tarea es enviarle UN solo mensaje de seguimiento.
 
@@ -4098,7 +4105,7 @@ Reglas:
 - Máximo 1-2 oraciones
 - Empieza con "${greeting} 🤍"
 - No menciones colores, modelos, precios ni servicios que no estén en la conversación; no inventes ni supongas nada
-- Solo devuelve el texto del mensaje, sin comillas ni explicaciones`;
+- Solo devuelve el texto del mensaje, sin comillas ni explicaciones${promoRegla}`;
 
   const userPrompt = `Conversación hasta ahora:\n${recentHistory || '(la clienta escribió pero no hay historial guardado)'}`;
 
@@ -4112,7 +4119,8 @@ Reglas:
     temperature: 0.85
   });
 
-  return response.choices?.[0]?.message?.content?.trim() || null;
+  const text = response.choices?.[0]?.message?.content?.trim() || null;
+  return { text, promoRecordada: !!(promoHoy && text && /buen\s*fin/i.test(text)) };
 }
 
 async function runRecoveryJob() {
@@ -4151,14 +4159,17 @@ async function runRecoveryJob() {
 
   for (const { phone, session } of eligible) {
     try {
-      const message = await generateRecoveryMessage(session, phone);
+      const { text: message, promoRecordada } = await generateRecoveryMessage(session, phone);
       if (!message) {
         console.warn(`⚠️  [Recovery Job] LLM no generó mensaje para ${phone}`);
         continue;
       }
 
       await sendWhatsAppMessage(phone, message);
-      sessions.updateSession(phone.replace(/\D/g, ''), { recovery_sent_at: new Date().toISOString() });
+      sessions.updateSession(phone.replace(/\D/g, ''), {
+        recovery_sent_at: new Date().toISOString(),
+        ...(promoRecordada ? { promo_recordada_fecha: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }) } : {})
+      });
       sessions.addToHistory(phone.replace(/\D/g, ''), 'assistant', message);
       console.log(`✅ [Recovery Job] Mensaje enviado a ${phone}: "${message}"`);
     } catch (err) {
