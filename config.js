@@ -54,9 +54,15 @@ async function init() {
         if (businessConfig[key] !== undefined) localOverrides[key] = businessConfig[key];
       }
 
+      // Precios: el panel solo edita precio_base; el resto (techo_promocion,
+      // precio_promedio, nota…) se toma siempre del archivo local.
+      const filePrecios = { ...(businessConfig.precios || {}) };
+      delete filePrecios.precio_base;
+
       // Mutate in-place so existing references stay valid
       Object.assign(businessConfig, result.rows[0].data);
       Object.assign(businessConfig, localOverrides);
+      businessConfig.precios = { ...(businessConfig.precios || {}), ...filePrecios };
       console.log('✅ Business config cargado desde DB (faqs/asuetos/promociones/colores_coleccion tomados del archivo local)');
     } else {
       // First deploy — seed the DB from the local JSON file

@@ -899,7 +899,7 @@ async function decideImageAction(captions, historial, clientName) {
 
     const captionText = captions.filter(Boolean).join(', ');
     const colores = (bizConfig.colores_coleccion || ['Ivory', 'Champagne', 'Nude']).join(', ');
-    const techoPromocion = ((bizConfig.precios && bizConfig.precios.techo_promocion) || 30000).toLocaleString('es-MX');
+    const techoPromocion = ((bizConfig.precios && bizConfig.precios.techo_promocion) || 35000).toLocaleString('es-MX');
 
     const prompt = `Eres el asistente de ${bizConfig.businessName || 'una boutique de vestidos de novia'}.
 Una clienta acaba de enviar ${captions.length === 1 ? 'una imagen' : `${captions.length} imágenes`}.

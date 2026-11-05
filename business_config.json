@@ -68,7 +68,7 @@
 
   "precios": {
     "precio_base": 29000,
-    "techo_promocion": 30000,
+    "techo_promocion": 35000,
     "precio_promedio": 35000,
     "moneda": "MXN",
     "nota": "El precio varía según modelo, forma de pago, fecha de compra, promociones y personalizaciones. No existen precios fijos por modelo — el precio final se define en el showroom según todos estos factores."
@@ -141,7 +141,7 @@
     },
     {
       "pregunta": "¿Cuánto cuestan los vestidos? ¿Cuáles son los precios?",
-      "respuesta": "Nuestros vestidos inician en $30,000 MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales.\n\nLo mejor es verlo contigo en showroom, porque nuestras asesoras pueden conseguirte sorpresas especiales o descuentos exclusivos según el modelo y la fecha de tu compra ✨\n¿Te agendamos tu cita? 👰‍♀️",
+      "respuesta": "Nuestros vestidos inician en $35,000 MXN y varían según el modelo, la forma de pago, fecha de compra, promoción aplicada y algunas personalizaciones finales.\n\nLo mejor es verlo contigo en showroom, porque nuestras asesoras pueden conseguirte sorpresas especiales o descuentos exclusivos según el modelo y la fecha de tu compra ✨\n¿Te agendamos tu cita? 👰‍♀️",
       "categoria": "Precios y Pagos"
     },
     {
