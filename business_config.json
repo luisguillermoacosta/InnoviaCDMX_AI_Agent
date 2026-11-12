@@ -9,6 +9,10 @@
     { "fecha": "12-31", "nombre": "Año nuevo" }
   ],
 
+  "aperturas_especiales": [
+    { "fecha": "2026-11-16", "nombre": "Buen Fin", "horario": "11am – 8pm" }
+  ],
+
   "existing_clients": [],
 
   "staff_phones": [

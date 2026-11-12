@@ -119,7 +119,8 @@ const {
   getCatalogInfo,
   getPricingInfo,
   getFAQs,
-  getPromotions
+  getPromotions,
+  getSpecialOpenings
 } = require('../config');
 const {
   getAvailableSlots,
@@ -471,6 +472,12 @@ function buildSystemPrompt(session, phone) {
     ? `\n## Recordatorio de promoción (hoy)\n- Hoy todavía no le has recordado la promoción a esta clienta. En esta respuesta menciónala UNA vez, de forma natural y breve, con esta idea: "${promoHoy.recordatorio}". No menciones porcentajes ni cifras de descuento.\n`
     : (promoVigenteHoy() ? `\n## Recordatorio de promoción (hoy)\n- Ya le recordaste hoy la promoción a esta clienta: no la vuelvas a mencionar en esta respuesta salvo que ella pregunte por promociones o descuentos.\n` : '');
 
+  // Aperturas especiales futuras (ej. lunes 16 nov por Buen Fin)
+  const aperturas = getSpecialOpenings().filter(a => a.fecha >= todayCDMX);
+  const aperturasInfo = aperturas.length
+    ? `\n## Aperturas especiales (días que normalmente cerramos pero SÍ abrimos)\n${aperturas.map(a => `- ${fechaLegible(a.fecha)} (${a.fecha}): ABIERTO por ${a.nombre}${a.horario ? `, horario ${a.horario}` : ''}.`).join('\n')}\n- Estas fechas tienen prioridad sobre "lunes cerrado" y sobre las FAQs de horario. Si la clienta pide una de estas fechas, NO digas que está cerrado: consulta \`buscar_slots_disponibles\` normalmente y ofrece los horarios con espacio azul.\n`
+    : '';
+
   const slotsInfo =
     session.slots_disponibles && session.slots_disponibles.length > 0
       ? `- **Horarios mostrados recientemente:** ${session.slots_disponibles
@@ -490,13 +497,13 @@ function buildSystemPrompt(session, phone) {
 ## Información del negocio
 - **Nombre:** ${biz.nombre}
 - **Dirección:** ${biz.direccion}
-- **Horarios:** Martes a sábado ${hours.martes_sabado || '11am – 8pm'}, domingos ${hours.domingos || '11am – 6pm'}, lunes cerrado
+- **Horarios:** Martes a sábado ${hours.martes_sabado || '11am – 8pm'}, domingos ${hours.domingos || '11am – 6pm'}, lunes cerrado${aperturas.length ? ' (salvo las aperturas especiales indicadas abajo)' : ''}
 - **Catálogo:** ${catalog.nombre || 'Colección 2026'} → ${CATALOG_PDF_URL} (link de descarga directa del PDF — es el mismo que se manda como adjunto)
 - **Inversión promedio:** $${(pricing.precio_promedio || 35000).toLocaleString()} MXN
 - **Con promociones directas con la asesora en cita, se puede llegar a encontrar en:** menos de $${(pricing.techo_promocion || 35000).toLocaleString()} MXN
 - **Colores de la colección (los únicos que manejamos):** ${colores}
 - **Nota precios:** ${pricing.nota || 'Los precios varían según modelo y personalizaciones'}
-${promoInfo}${promoRecordatorio}
+${promoInfo}${promoRecordatorio}${aperturasInfo}
 ## Contexto de la clienta
 - **Teléfono:** ${phone}
 - **Nombre:** ${clientName || 'No proporcionado aún'}

@@ -232,6 +232,18 @@ function getHolidays() {
 }
 
 /**
+ * Días que normalmente están cerrados (ej. lunes) pero abren de forma especial.
+ * Formato: [{ fecha: "YYYY-MM-DD", nombre, horario }]
+ */
+function getSpecialOpenings() {
+  return config.aperturas_especiales || [];
+}
+
+function getSpecialOpening(dateString) {
+  return getSpecialOpenings().find(a => a.fecha === dateString) || null;
+}
+
+/**
  * Get promotions list
  */
 function getPromotions() {
@@ -456,6 +468,8 @@ module.exports = {
 
   // Holidays
   getHolidays,
+  getSpecialOpenings,
+  getSpecialOpening,
 
   // Promotions
   getPromotions,

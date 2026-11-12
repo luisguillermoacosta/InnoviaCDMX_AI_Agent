@@ -12,7 +12,7 @@
  * dependencies from the main bot file.
  */
 
-const { getBusinessHours, getHolidays } = require('../config');
+const { getBusinessHours, getHolidays, getSpecialOpening } = require('../config');
 
 /**
  * Fecha y hora actual en CDMX, para registrar cuándo el bot hizo la cita
@@ -40,6 +40,13 @@ function isDayOpen(dateString) {
     const dayName = dayNames[dayOfWeek];
     
     const hours = getBusinessHours();
+
+    // Apertura especial (ej. lunes de Buen Fin): abre aunque normalmente esté cerrado
+    const apertura = getSpecialOpening(dateString);
+    if (apertura) {
+      console.log(`   ✅ ${dateString} es apertura especial: ${apertura.nombre}`);
+      return true;
+    }
     
     // Verificar si el día está cerrado por horario
     if (dayName === 'lunes' && hours.lunes === 'Cerrado') {

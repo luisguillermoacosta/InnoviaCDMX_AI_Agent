@@ -729,8 +729,11 @@ function isDayOpen(dateString) {
     const dayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
     const dayName = dayNames[dayOfWeek];
     
-    const { getBusinessHours } = require('./config');
+    const { getBusinessHours, getSpecialOpening } = require('./config');
     const hours = getBusinessHours();
+
+    // Apertura especial (ej. lunes de Buen Fin)
+    if (getSpecialOpening(dateString)) return true;
     
     // Verificar si el día está cerrado
     if (dayName === 'lunes' && hours.lunes === 'Cerrado') {
