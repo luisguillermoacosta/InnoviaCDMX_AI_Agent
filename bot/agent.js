@@ -478,6 +478,13 @@ function buildSystemPrompt(session, phone) {
     ? `\n## Aperturas especiales (días que normalmente cerramos pero SÍ abrimos)\n${aperturas.map(a => `- ${fechaLegible(a.fecha)} (${a.fecha}): ABIERTO por ${a.nombre}${a.horario ? `, horario ${a.horario}` : ''}.`).join('\n')}\n- Estas fechas tienen prioridad sobre "lunes cerrado" y sobre las FAQs de horario. Si la clienta pide una de estas fechas, NO digas que está cerrado: consulta \`buscar_slots_disponibles\` normalmente y ofrece los horarios con espacio azul.\n`
     : '';
 
+  // Fechas a impulsar (ej. sábado con pocos espacios que se quiere llenar).
+  // Se sugieren primero mientras la fecha no haya pasado.
+  const impulsar = (((require('../config').get() || {}).fechas_a_impulsar) || []).filter(f => f.fecha >= todayCDMX);
+  const impulsarInfo = impulsar.length
+    ? `\n## Fecha prioritaria para sugerir\n${impulsar.map(f => `- ${fechaLegible(f.fecha)} (${f.fecha})${f.motivo ? ` — ${f.motivo} (nota interna: no digas que \"queremos llenarlo\"; preséntalo como algo especial para ella)` : ''}.`).join('\n')}\n- Cuando la clienta quiera agendar y **todavía no haya dicho una fecha concreta** (pregunta "¿qué días tienen?", "¿cuándo puedo ir?", "lo antes posible", "esta semana", "el fin de semana", o no sabe qué día), sugiérele PRIMERO esta fecha: llama a \`buscar_slots_disponibles\` para esa fecha y preséntala con el patrón de alta demanda de la regla 6b (un solo horario a la vez, solo de espacios azules reales).\n- Si la fecha que pidió la clienta no tiene disponibilidad, ofrécele esta fecha como primera alternativa (si tiene espacio azul).\n- Si la clienta ya pidió una fecha específica que sí tiene espacio, respeta su fecha: no la cambies ni insistas.\n- Si \`buscar_slots_disponibles\` no regresa horarios para esta fecha, ya no la sugieras y sigue el flujo normal.\n`
+    : '';
+
   const slotsInfo =
     session.slots_disponibles && session.slots_disponibles.length > 0
       ? `- **Horarios mostrados recientemente:** ${session.slots_disponibles
@@ -503,7 +510,7 @@ function buildSystemPrompt(session, phone) {
 - **Con promociones directas con la asesora en cita, se puede llegar a encontrar en:** menos de $${(pricing.techo_promocion || 35000).toLocaleString()} MXN
 - **Colores de la colección (los únicos que manejamos):** ${colores}
 - **Nota precios:** ${pricing.nota || 'Los precios varían según modelo y personalizaciones'}
-${promoInfo}${promoRecordatorio}${aperturasInfo}
+${promoInfo}${promoRecordatorio}${aperturasInfo}${impulsarInfo}
 ## Contexto de la clienta
 - **Teléfono:** ${phone}
 - **Nombre:** ${clientName || 'No proporcionado aún'}

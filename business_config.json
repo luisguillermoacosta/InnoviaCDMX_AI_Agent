@@ -13,6 +13,10 @@
     { "fecha": "2026-11-16", "nombre": "Buen Fin", "horario": "11am – 8pm" }
   ],
 
+  "fechas_a_impulsar": [
+    { "fecha": "2026-11-14", "motivo": "Quedan pocos espacios este sábado" }
+  ],
+
   "existing_clients": [],
 
   "staff_phones": [
