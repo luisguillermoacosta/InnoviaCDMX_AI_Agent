@@ -14,7 +14,8 @@
   ],
 
   "fechas_a_impulsar": [
-    { "fecha": "2026-11-14", "motivo": "Quedan pocos espacios este sábado" }
+    { "fecha": "2026-11-14", "motivo": "Quedan pocos espacios este sábado" },
+    { "fecha": "2026-11-16", "motivo": "Abrimos este lunes de forma especial por el Buen Fin y hay buena disponibilidad" }
   ],
 
   "existing_clients": [],
