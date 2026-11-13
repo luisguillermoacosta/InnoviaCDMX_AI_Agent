@@ -48,7 +48,7 @@ async function init() {
       // el panel /api/config — se preservan del archivo local, para que una copia
       // vieja sembrada en DB en un deploy anterior no pise ediciones nuevas
       // (ej. FAQs o promociones agregadas al archivo después del primer seed).
-      const jsonManagedKeys = ['faqs', 'asuetos', 'promociones', 'colores_coleccion'];
+      const jsonManagedKeys = ['faqs', 'asuetos', 'promociones', 'colores_coleccion', 'aperturas_especiales', 'fechas_a_impulsar'];
       const localOverrides = {};
       for (const key of jsonManagedKeys) {
         if (businessConfig[key] !== undefined) localOverrides[key] = businessConfig[key];
@@ -63,7 +63,7 @@ async function init() {
       Object.assign(businessConfig, result.rows[0].data);
       Object.assign(businessConfig, localOverrides);
       businessConfig.precios = { ...(businessConfig.precios || {}), ...filePrecios };
-      console.log('✅ Business config cargado desde DB (faqs/asuetos/promociones/colores_coleccion tomados del archivo local)');
+      console.log('✅ Business config cargado desde DB (faqs/asuetos/promociones/colores_coleccion/aperturas_especiales/fechas_a_impulsar tomados del archivo local)');
     } else {
       // First deploy — seed the DB from the local JSON file
       await pool.query(
